@@ -88,7 +88,7 @@ Implementações:
 - **user** — id, email, senha_hash, nome, ativo, criado_em (login simples).
 - **linkedin_account** — id, nome, provider, external_account_id, status, token(Fernet), conectado_em.
 - **knowledge_item** (Q&A) — id, pergunta, resposta, tags, categoria, ativo, criado_em.
-- **brand_voice** — id, descricao_empresa, tom, icp, cta (registro único de config).
+- **brand_voice** — id, **nome_assistente** (nome da funcionária, ex. "Sofia"), **persona** (personalidade/estilo), **avatar_url** (opcional), **assina_mensagens** (bool), descricao_empresa, tom, icp, cta (registro único de config). O nome/persona da funcionária entra no prompt de todos os agentes e pode assinar mensagens.
 - **lead** — id, nome, headline, empresa, cargo, linkedin_url, origem, status(NOVO|SEGUINDO|CONVIDADO|ABORDADO|RESPONDEU|QUALIFICADO|GANHO|PERDIDO), notas, criado_em.
 - **conversation** — id, lead_id(FK), canal, external_id, criado_em.
 - **message** — id, conversation_id(FK), autor(LEAD|EU|IA_RASCUNHO), conteudo, enviado_em/criado_em.
@@ -124,7 +124,7 @@ Implementações:
 - **Conversas / Inbox** — chat unificado; Atendente sugere/responde; liga/desliga automático.
 - **Leads (CRM)** — funil por status.
 - **Base de Conhecimento** — CRUD Q&A.
-- **Marca / Voz** — empresa, tom, ICP, CTA.
+- **Marca / Voz** — nome da funcionária + persona + avatar (opcional) + se assina mensagens; empresa, tom, ICP, CTA.
 - **Prompts** — editar prompts dos agentes.
 - **Aprendizado** — lacunas detectadas, correções, o que está funcionando.
 
