@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.routers import auth
 
 app = FastAPI(
     title=settings.app_name,
@@ -32,4 +33,6 @@ def health() -> dict:
     }
 
 
-# Os routers (auth, knowledge, leads, agents, ...) entram nas próximas etapas.
+app.include_router(auth.router)
+
+# Próximos routers (knowledge, leads, conversations, agents, ...) entram nas próximas etapas.
