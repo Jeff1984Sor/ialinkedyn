@@ -63,7 +63,7 @@ Ele **posta conteúdo**, **prospecta** (busca empresas/pessoas, segue, aborda), 
 - **Backend:** Python 3.11+, FastAPI, SQLAlchemy 2.0, Pydantic v2, Alembic.
 - **Banco:** PostgreSQL na VPS prod1, database `ialinkedyn`.
 - **Worker:** APScheduler (jobs: publicar agendados, prospecção com ritmo, coletar mensagens novas, follow com limite diário).
-- **IA:** orquestração direta com LLM via `.env`. Avaliar **Claude** (claude-sonnet-5) para conversa/tom em PT-BR.
+- **IA:** **Google Gemini** (`google-genai`), modelo configurável em `.env` (`GEMINI_MODEL`, ex. `gemini-2.5-flash`); `GEMINI_API_KEY` fora do git. Orquestração direta dos agentes.
 - **Frontend:** Next.js + TS + Tailwind + shadcn/ui + TanStack Query + Recharts.
 - **Auth:** JWT simples (single-tenant; sem tenant_id).
 - **Config:** tudo em `.env`; tokens de terceiros criptografados com Fernet.
@@ -171,7 +171,7 @@ Implementações:
 ## 11. DECISÕES EM ABERTO
 
 - [ ] Contratar provedor (Unipile recomendado) — depende do usuário; MockProvider destrava o desenvolvimento antes disso.
-- [ ] LLM dos agentes: Claude (conversa/PT-BR) x OpenAI.
+- [x] LLM dos agentes = **Google Gemini** (`google-genai`, `GEMINI_MODEL` configurável).
 - [x] Servidor = **prod1**. Portas 8021/3021 confirmadas livres (auditoria 2026-07-13). Falta: subdomínio + DNS.
 - [ ] Acento visual (petróleo/roxo do Maya x azul LinkedIn).
 
