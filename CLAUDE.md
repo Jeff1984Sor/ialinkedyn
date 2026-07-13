@@ -52,7 +52,7 @@ Ele **posta conteúdo**, **prospecta** (busca empresas/pessoas, segue, aborda), 
 
 ## 3.1 FLUXO DE TRABALHO
 
-- Edição **local** (VS Code + Claude Code). **NADA roda/testa na máquina local** — execução, banco e testes só na **VM (VPS prod2)**.
+- Edição **local** (VS Code + Claude Code). **NADA roda/testa na máquina local** — execução, banco e testes só na **VM (VPS prod1)** — hostname `servidor-prod1`. (O MayaPost mora no prod2; IALinkedyn é no prod1.)
 - Deploy/atualização via git: `git pull → pip install -r requirements.txt → alembic upgrade head → (frontend) npm install && npm run build → restart systemd`.
 - Não tentar subir servidor/Postgres local nem rodar a app localmente.
 
@@ -61,7 +61,7 @@ Ele **posta conteúdo**, **prospecta** (busca empresas/pessoas, segue, aborda), 
 ## 4. STACK (inspirada no MayaPost)
 
 - **Backend:** Python 3.11+, FastAPI, SQLAlchemy 2.0, Pydantic v2, Alembic.
-- **Banco:** PostgreSQL na VPS prod2, database `ialinkedyn`.
+- **Banco:** PostgreSQL na VPS prod1, database `ialinkedyn`.
 - **Worker:** APScheduler (jobs: publicar agendados, prospecção com ritmo, coletar mensagens novas, follow com limite diário).
 - **IA:** orquestração direta com LLM via `.env`. Avaliar **Claude** (claude-sonnet-5) para conversa/tom em PT-BR.
 - **Frontend:** Next.js + TS + Tailwind + shadcn/ui + TanStack Query + Recharts.
@@ -151,7 +151,9 @@ Implementações:
 
 **Fase 3 — Real & Deploy**
 12. [ ] UnipileProvider (liga o real: postar, conectar, buscar, seguir, mensagens + webhooks)
-13. [ ] Deploy VPS prod2 (systemd + Nginx + subdomínio `ialinkedyn.mayacorp.com.br` + DB) — molde MayaPost
+13. [ ] Deploy VPS **prod1** (systemd + Nginx + subdomínio `ialinkedyn.mayacorp.com.br` + DB) — receita de deploy = molde MayaPost.
+    - ⚠️ **prod1 é compartilhada. NÃO duplicar infra.** REUSAR: Postgres (só criar DB `ialinkedyn`), Nginx (só site novo), certbot, runtimes. EXCLUSIVO/isolado: DB `ialinkedyn`, portas próprias, serviços `ialinkedyn-*`, subdomínio, venv próprio.
+    - **Auditoria do prod1 (feita 2026-07-13):** portas 8020/8021/3020/3021 LIVRES; DBs existentes só `sistemarca` (owner admin) + padrão — sem `mayapost` aqui; nenhum serviço maya/pilates/flic/beach; Nginx tem só o site `rca_final`. → usar **DB `ialinkedyn`**, **portas 8021/3021**, serviços `ialinkedyn-*` sem colisão.
 
 **Regra full-stack:** toda feature tem backend E frontend.
 
@@ -170,7 +172,7 @@ Implementações:
 
 - [ ] Contratar provedor (Unipile recomendado) — depende do usuário; MockProvider destrava o desenvolvimento antes disso.
 - [ ] LLM dos agentes: Claude (conversa/PT-BR) x OpenAI.
-- [ ] Portas na prod2 (sugestão 8021/3021) + subdomínio.
+- [x] Servidor = **prod1**. Portas 8021/3021 confirmadas livres (auditoria 2026-07-13). Falta: subdomínio + DNS.
 - [ ] Acento visual (petróleo/roxo do Maya x azul LinkedIn).
 
 ---
