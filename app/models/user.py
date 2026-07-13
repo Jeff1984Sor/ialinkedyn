@@ -1,4 +1,7 @@
-"""Model de usuário (login do painel — single-tenant)."""
+"""Model de usuário (login do painel — single-tenant).
+
+Login por **usuário** (username), não por e-mail. Uso interno.
+"""
 from __future__ import annotations
 
 from datetime import datetime
@@ -13,7 +16,7 @@ class User(Base):
     __tablename__ = "user"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    usuario: Mapped[str] = mapped_column(String(60), unique=True, index=True, nullable=False)
     senha_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     nome: Mapped[str] = mapped_column(String(120), nullable=False)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

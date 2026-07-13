@@ -3,11 +3,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserCreate(BaseModel):
-    email: EmailStr
+    usuario: str = Field(min_length=1, max_length=60)
     nome: str = Field(min_length=1, max_length=120)
     senha: str = Field(min_length=6, max_length=128)
 
@@ -16,7 +16,7 @@ class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    email: EmailStr
+    usuario: str
     nome: str
     ativo: bool
     criado_em: datetime

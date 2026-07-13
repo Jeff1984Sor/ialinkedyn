@@ -17,14 +17,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 def register(dados: UserCreate, db: Session = Depends(get_db)) -> User:
     """Cria um usuário. Single-tenant: uso interno (poucos usuários)."""
-    existe = db.scalar(select(User).where(User.email == dados.email))
+    existe = db.scalar(select(User).where(User.usuario == dados.usuario))
     if existe:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Já existe um usuário com esse e-mail",
+            detail="Já existe um usuário com esse login",
         )
     user = User(
-        email=dados.email,
+        usuario=dados.usuario,
         nome=dados.nome,
         senha_hash=hash_password(dados.senha),
     )
@@ -39,12 +39,12 @@ def login(
     form: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ) -> Token:
-    """Login via formulário OAuth2 (username = e-mail)."""
-    user = db.scalar(select(User).where(User.email == form.username))
+    """Login via formulário OAuth2 (username = usuário)."""
+    user = db.scalar(select(User).where(User.usuario == form.username))
     if not user or not verify_password(form.password, user.senha_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="E-mail ou senha inválidos",
+            detail="Usuário ou senha inválidos",
             headers={"WWW-Authenticate": "Bearer"},
         )
     if not user.ativo:

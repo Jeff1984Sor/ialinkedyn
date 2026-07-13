@@ -22,7 +22,7 @@ def upgrade() -> None:
     op.create_table(
         "user",
         sa.Column("id", sa.Integer(), primary_key=True),
-        sa.Column("email", sa.String(length=255), nullable=False),
+        sa.Column("usuario", sa.String(length=60), nullable=False),
         sa.Column("senha_hash", sa.String(length=255), nullable=False),
         sa.Column("nome", sa.String(length=120), nullable=False),
         sa.Column("ativo", sa.Boolean(), nullable=False, server_default=sa.true()),
@@ -33,9 +33,9 @@ def upgrade() -> None:
             nullable=False,
         ),
     )
-    op.create_index("ix_user_email", "user", ["email"], unique=True)
+    op.create_index("ix_user_usuario", "user", ["usuario"], unique=True)
 
 
 def downgrade() -> None:
-    op.drop_index("ix_user_email", table_name="user")
+    op.drop_index("ix_user_usuario", table_name="user")
     op.drop_table("user")
