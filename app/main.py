@@ -5,7 +5,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.routers import auth
+from app.routers import (
+    agents,
+    auth,
+    brand,
+    conversations,
+    dashboard,
+    knowledge,
+    leads,
+)
 
 app = FastAPI(
     title=settings.app_name,
@@ -34,5 +42,9 @@ def health() -> dict:
 
 
 app.include_router(auth.router)
-
-# Próximos routers (knowledge, leads, conversations, agents, ...) entram nas próximas etapas.
+app.include_router(knowledge.router)
+app.include_router(brand.router)
+app.include_router(leads.router)
+app.include_router(conversations.router)
+app.include_router(agents.router)
+app.include_router(dashboard.router)
