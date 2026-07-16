@@ -13,6 +13,7 @@ import {
   Sparkles,
   Target,
   FileText,
+  Link2,
   LogOut,
   Loader2,
 } from "lucide-react";
@@ -34,6 +35,10 @@ const NAV = [
       { href: "/marca", label: "Marca / Voz", icon: Sparkles },
       { href: "/prompts", label: "Prompts", icon: FileText },
     ],
+  },
+  {
+    grupo: "Configuração",
+    itens: [{ href: "/conexoes", label: "Conexões", icon: Link2 }],
   },
 ];
 

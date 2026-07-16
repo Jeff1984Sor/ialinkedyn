@@ -9,6 +9,7 @@ from app.routers import (
     agents,
     auth,
     brand,
+    connection,
     conversations,
     dashboard,
     knowledge,
@@ -48,3 +49,4 @@ app.include_router(leads.router)
 app.include_router(conversations.router)
 app.include_router(agents.router)
 app.include_router(dashboard.router)
+app.include_router(connection.router)
