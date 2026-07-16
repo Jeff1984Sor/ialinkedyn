@@ -19,6 +19,7 @@ from app.schemas.agent import (
     ResponderResponse,
 )
 from app.services.brand import get_or_create_brand
+from app.services.config_service import get_gemini
 from app.services.gemini import gerar_texto
 from app.services.knowledge_search import buscar_relevantes
 
@@ -52,8 +53,9 @@ def responder(
         f"[{m.autor}] {m.conteudo}" for m in conversa.mensagens
     )
 
+    api_key, model = get_gemini(db)
     prompt = prompt_atendente(brand, qa, historico, mensagem_lead)
-    resposta = gerar_texto(prompt)
+    resposta = gerar_texto(prompt, api_key, model)
 
     if dados.salvar_rascunho:
         rascunho = Message(
@@ -83,7 +85,7 @@ def prospectar(
     resumo = ""
 
     if dados.linkedin_url and not perfil_texto:
-        provider = get_provider()
+        provider = get_provider(db)
         perfil = provider.obter_perfil(dados.linkedin_url)
         perfil_texto = _perfil_para_texto(perfil)
         resumo = f"{perfil.nome} — {perfil.headline}"
@@ -102,8 +104,9 @@ def prospectar(
             detail="Informe um linkedin_url, um lead_id ou um perfil_texto.",
         )
 
+    api_key, model = get_gemini(db)
     prompt = prompt_cacador(brand, perfil_texto)
-    abordagem = gerar_texto(prompt)
+    abordagem = gerar_texto(prompt, api_key, model)
     return ProspectarResponse(abordagem=abordagem, perfil_resumo=resumo)
 
 

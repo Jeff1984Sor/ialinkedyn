@@ -42,3 +42,30 @@ class AutomationUpdate(BaseModel):
     modo_chat: str | None = Field(default=None, pattern="^(MANUAL|AUTO)$")
     horario_inicio: int | None = Field(default=None, ge=0, le=23)
     horario_fim: int | None = Field(default=None, ge=0, le=23)
+
+
+class ConfigOut(BaseModel):
+    """Configuração da ferramenta (segredos SEMPRE mascarados)."""
+
+    linkedin_provider: str
+    unipile_dsn: str = ""
+    unipile_key_configurada: bool = False
+    unipile_key_mascarada: str = ""
+    gemini_key_configurada: bool = False
+    gemini_key_mascarada: str = ""
+    gemini_model: str = "gemini-2.5-flash"
+
+
+class ConfigUpdate(BaseModel):
+    """Omitir um campo = manter como está. Enviar "" = apagar."""
+
+    linkedin_provider: str | None = Field(default=None, pattern="^(mock|unipile)$")
+    unipile_dsn: str | None = None
+    unipile_api_key: str | None = None
+    gemini_api_key: str | None = None
+    gemini_model: str | None = None
+
+
+class TesteIAResult(BaseModel):
+    ok: bool
+    mensagem: str

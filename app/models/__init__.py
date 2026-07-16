@@ -5,6 +5,7 @@ todas as tabelas via Base.metadata.
 """
 from app.core.database import Base
 from app.models.brand import BrandVoice
+from app.models.config import AppConfig
 from app.models.connection import AutomationSettings, LinkedInAccount
 from app.models.conversation import Conversation, Message
 from app.models.knowledge import KnowledgeItem
@@ -21,4 +22,5 @@ __all__ = [
     "Message",
     "LinkedInAccount",
     "AutomationSettings",
+    "AppConfig",
 ]

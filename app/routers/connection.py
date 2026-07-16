@@ -1,4 +1,8 @@
-"""Conexões — vincular a conta do LinkedIn e configurar limites de automação."""
+"""Conexões — configurar provedor/IA, vincular a conta e limites de automação.
+
+TUDO é configurável pelo painel (nada de mexer no .env). Segredos ficam
+criptografados com Fernet no banco.
+"""
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -7,7 +11,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.core.deps import get_current_user, get_db
 from app.core.security import encrypt_token
 from app.models.connection import AutomationSettings, LinkedInAccount
@@ -16,18 +19,30 @@ from app.schemas.connection import (
     AutomationOut,
     AutomationUpdate,
     ConectarRequest,
+    ConfigOut,
+    ConfigUpdate,
     ConexaoStatus,
+    TesteIAResult,
 )
+from app.services.config_service import (
+    cifra,
+    get_config,
+    get_gemini,
+    get_provider_name,
+    get_unipile,
+    mascarar,
+)
+from app.services.gemini import testar_chave
 
 router = APIRouter(prefix="/connection", tags=["connection"])
 
 _AVISO_MOCK = (
-    "Provedor SIMULADO (mock). Nenhuma conta real do LinkedIn está conectada — "
-    "as ações são fingidas, sem risco e sem custo. Para conectar de verdade, "
-    "contrate o Unipile e configure UNIPILE_API_KEY + LINKEDIN_PROVIDER=unipile no .env."
+    "Provedor SIMULADO (mock): nenhuma conta real do LinkedIn está conectada — "
+    "as ações são fingidas, sem risco e sem custo. Para valer, escolha o provedor "
+    "Unipile aqui embaixo e cole a chave dele."
 )
 _AVISO_UNIPILE_SEM_CHAVE = (
-    "LINKEDIN_PROVIDER=unipile, mas UNIPILE_API_KEY não está configurada no .env do servidor."
+    "Provedor Unipile selecionado, mas a chave de API ainda não foi preenchida aqui embaixo."
 )
 
 
@@ -45,18 +60,82 @@ def _get_or_create_settings(db: Session) -> AutomationSettings:
     return cfg
 
 
+# ---------------------------------------------------------------- configuração
+
+
+@router.get("/config", response_model=ConfigOut)
+def obter_config(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> ConfigOut:
+    cfg = get_config(db)
+    _, unipile_key = get_unipile(db)
+    gemini_key, gemini_model = get_gemini(db)
+    return ConfigOut(
+        linkedin_provider=cfg.linkedin_provider,
+        unipile_dsn=cfg.unipile_dsn,
+        unipile_key_configurada=bool(unipile_key),
+        unipile_key_mascarada=mascarar(unipile_key),
+        gemini_key_configurada=bool(gemini_key),
+        gemini_key_mascarada=mascarar(gemini_key),
+        gemini_model=gemini_model,
+    )
+
+
+@router.put("/config", response_model=ConfigOut)
+def atualizar_config(
+    dados: ConfigUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> ConfigOut:
+    """Salva a configuração. Campos de chave: omitir = manter, "" = apagar."""
+    cfg = get_config(db)
+
+    if dados.linkedin_provider is not None:
+        cfg.linkedin_provider = dados.linkedin_provider
+    if dados.unipile_dsn is not None:
+        cfg.unipile_dsn = dados.unipile_dsn
+    if dados.gemini_model is not None:
+        cfg.gemini_model = dados.gemini_model or "gemini-2.5-flash"
+    if dados.unipile_api_key is not None:
+        cfg.unipile_api_key_cifrado = cifra(dados.unipile_api_key)
+    if dados.gemini_api_key is not None:
+        cfg.gemini_api_key_cifrado = cifra(dados.gemini_api_key)
+
+    db.commit()
+    return obter_config(db=db, _=user)
+
+
+@router.post("/testar-ia", response_model=TesteIAResult)
+def testar_ia(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> TesteIAResult:
+    """Faz uma chamada real ao Gemini para validar a chave salva."""
+    api_key, model = get_gemini(db)
+    try:
+        resposta = testar_chave(api_key, model)
+        return TesteIAResult(ok=True, mensagem=f"Funcionando! ({model}) → {resposta[:60]}")
+    except HTTPException as e:
+        return TesteIAResult(ok=False, mensagem=str(e.detail))
+
+
+# ---------------------------------------------------------------- status/conta
+
+
 @router.get("/status", response_model=ConexaoStatus)
 def status(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> ConexaoStatus:
     conta = _get_account(db)
-    provider = settings.linkedin_provider
+    provider = get_provider_name(db)
 
     if provider == "mock":
         pronto, aviso = True, _AVISO_MOCK
     elif provider == "unipile":
-        pronto = bool(settings.unipile_api_key)
+        _, key = get_unipile(db)
+        pronto = bool(key)
         aviso = "" if pronto else _AVISO_UNIPILE_SEM_CHAVE
     else:
         pronto, aviso = False, f"Provedor desconhecido: {provider}"
@@ -80,15 +159,14 @@ def conectar(
     user: User = Depends(get_current_user),
 ) -> ConexaoStatus:
     """Vincula a conta do LinkedIn ao painel (via provedor)."""
-    provider = settings.linkedin_provider
+    provider = get_provider_name(db)
 
     if provider == "unipile":
-        # Fase 3: aqui abriremos o fluxo real de conexão do Unipile.
         raise HTTPException(
             status_code=501,
             detail=(
                 "Conexão real via Unipile ainda não implementada (Fase 3). "
-                "Use LINKEDIN_PROVIDER=mock para desenvolver."
+                "Selecione o provedor 'Simulado (mock)' para desenvolver."
             ),
         )
     if provider != "mock":
@@ -103,7 +181,6 @@ def conectar(
     conta.provider = provider
     conta.external_account_id = "mock-account-1"
     conta.status = "CONECTADO"
-    # mesmo no mock, guardamos o "token" já criptografado (mesmo caminho do real)
     conta.token_cifrado = encrypt_token("token-simulado")
     conta.conectado_em = datetime.now(timezone.utc)
     db.commit()
@@ -124,6 +201,9 @@ def desconectar(
         conta.conectado_em = None
         db.commit()
     return status(db=db, _=user)
+
+
+# ---------------------------------------------------------------- limites
 
 
 @router.get("/settings", response_model=AutomationOut)

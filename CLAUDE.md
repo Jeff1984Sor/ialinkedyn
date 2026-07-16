@@ -63,7 +63,8 @@ Ele **posta conteúdo**, **prospecta** (busca empresas/pessoas, segue, aborda), 
 - **Backend:** Python 3.11+, FastAPI, SQLAlchemy 2.0, Pydantic v2, Alembic.
 - **Banco:** PostgreSQL na VPS prod1, database `ialinkedyn`.
 - **Worker:** APScheduler (jobs: publicar agendados, prospecção com ritmo, coletar mensagens novas, follow com limite diário).
-- **IA:** **Google Gemini** (`google-genai`), modelo configurável em `.env` (`GEMINI_MODEL`, ex. `gemini-2.5-flash`); `GEMINI_API_KEY` fora do git. Orquestração direta dos agentes.
+- **IA:** **Google Gemini** (`google-genai`). Orquestração direta dos agentes.
+- ⚠️ **Configuração é pelo PAINEL, não pelo `.env`.** Chaves de produto (Gemini, Unipile) e escolha do provedor ficam na tabela `app_config`, **criptografadas com Fernet**, editáveis na tela **Conexões**. O `.env` guarda só infra: `DATABASE_URL`, `JWT_SECRET`, `FERNET_KEY`, CORS.
 - **Frontend:** Next.js + TS + Tailwind + shadcn/ui + TanStack Query + Recharts.
 - **Auth:** JWT simples (single-tenant; sem tenant_id).
 - **Config:** tudo em `.env`; tokens de terceiros criptografados com Fernet.

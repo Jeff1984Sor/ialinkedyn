@@ -1,17 +1,23 @@
-"""Escolhe o provedor conforme LINKEDIN_PROVIDER no .env."""
+"""Escolhe o provedor conforme a configuração salva no painel."""
 from __future__ import annotations
 
-from app.core.config import settings
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+
 from app.providers.base import LinkedInProvider
 from app.providers.mock import MockProvider
+from app.services.config_service import get_provider_name
 
 
-def get_provider() -> LinkedInProvider:
-    if settings.linkedin_provider == "unipile":
+def get_provider(db: Session) -> LinkedInProvider:
+    nome = get_provider_name(db)
+    if nome == "unipile":
         # UnipileProvider entra na Fase 3 (provedor real).
-        # from app.providers.unipile import UnipileProvider
-        # return UnipileProvider()
-        raise NotImplementedError(
-            "UnipileProvider ainda não implementado (Fase 3). Use LINKEDIN_PROVIDER=mock."
+        raise HTTPException(
+            status_code=501,
+            detail=(
+                "Provedor Unipile ainda não implementado (Fase 3). "
+                "Em Conexões, selecione o provedor 'Simulado (mock)' para desenvolver."
+            ),
         )
     return MockProvider()
