@@ -14,6 +14,7 @@ from app.routers import (
     dashboard,
     knowledge,
     leads,
+    prompts,
 )
 
 app = FastAPI(
@@ -50,3 +51,4 @@ app.include_router(conversations.router)
 app.include_router(agents.router)
 app.include_router(dashboard.router)
 app.include_router(connection.router)
+app.include_router(prompts.router)

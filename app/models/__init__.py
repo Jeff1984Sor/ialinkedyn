@@ -10,6 +10,7 @@ from app.models.connection import AutomationSettings, LinkedInAccount
 from app.models.conversation import Conversation, Message
 from app.models.knowledge import KnowledgeItem
 from app.models.lead import Lead
+from app.models.prompt import PromptTemplate
 from app.models.user import User
 
 __all__ = [
@@ -23,4 +24,5 @@ __all__ = [
     "LinkedInAccount",
     "AutomationSettings",
     "AppConfig",
+    "PromptTemplate",
 ]

@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.agents.prompts import prompt_atendente, prompt_cacador
+from app.agents import prompt_store
+from app.agents.prompts import montar_atendente, montar_cacador
 from app.core.deps import get_current_user, get_db
 from app.models.conversation import Conversation, Message
 from app.models.enums import MessageAuthor
@@ -13,13 +15,18 @@ from app.models.user import User
 from app.providers.base import PerfilLinkedIn
 from app.providers.factory import get_provider
 from app.schemas.agent import (
+    BuscarRequest,
+    BuscarResponse,
+    ImportarRequest,
+    ImportarResponse,
+    PerfilEncontrado,
     ProspectarRequest,
     ProspectarResponse,
     ResponderRequest,
     ResponderResponse,
 )
 from app.services.brand import get_or_create_brand
-from app.services.config_service import get_gemini
+from app.services.config_service import get_gemini, get_provider_name
 from app.services.gemini import gerar_texto
 from app.services.knowledge_search import buscar_relevantes
 
@@ -54,7 +61,8 @@ def responder(
     )
 
     api_key, model = get_gemini(db)
-    prompt = prompt_atendente(brand, qa, historico, mensagem_lead)
+    template = prompt_store.resolver(db, "atendente")
+    prompt = montar_atendente(template, brand, qa, historico, mensagem_lead)
     resposta = gerar_texto(prompt, api_key, model)
 
     if dados.salvar_rascunho:
@@ -105,9 +113,102 @@ def prospectar(
         )
 
     api_key, model = get_gemini(db)
-    prompt = prompt_cacador(brand, perfil_texto)
+    template = prompt_store.resolver(db, "cacador")
+    prompt = montar_cacador(template, brand, perfil_texto)
     abordagem = gerar_texto(prompt, api_key, model)
     return ProspectarResponse(abordagem=abordagem, perfil_resumo=resumo)
+
+
+@router.post("/buscar", response_model=BuscarResponse)
+def buscar(
+    dados: BuscarRequest,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> BuscarResponse:
+    """Caçador: busca pessoas no LinkedIn pelo ICP (ou por um termo livre)."""
+    brand = get_or_create_brand(db)
+    termo = (dados.termo or "").strip() or (brand.icp or "").strip()
+    if not termo:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Informe o que buscar, ou cadastre seu Público Ideal (ICP) "
+                "em Marca / Voz para o Caçador usar."
+            ),
+        )
+
+    provider = get_provider(db)
+    encontrados = provider.buscar_pessoas(termo, limite=dados.limite)
+
+    # marca quem já existe no CRM (evita importar duplicado)
+    urls_existentes = {
+        u for (u,) in db.execute(select(Lead.linkedin_url).where(Lead.linkedin_url != "")).all()
+    }
+
+    perfis = [
+        PerfilEncontrado(
+            nome=p.nome,
+            headline=p.headline,
+            empresa=p.empresa,
+            cargo=p.cargo,
+            linkedin_url=p.linkedin_url,
+            sobre=p.sobre,
+            posts_recentes=list(p.posts_recentes),
+            ja_importado=bool(p.linkedin_url and p.linkedin_url in urls_existentes),
+        )
+        for p in encontrados
+    ]
+
+    nome_provider = get_provider_name(db)
+    return BuscarResponse(
+        termo_usado=termo,
+        provider=nome_provider,
+        simulado=(nome_provider == "mock"),
+        perfis=perfis,
+    )
+
+
+@router.post("/importar-leads", response_model=ImportarResponse)
+def importar_leads(
+    dados: ImportarRequest,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> ImportarResponse:
+    """Importa os perfis encontrados como Leads no CRM (sem duplicar)."""
+    urls_existentes = {
+        u for (u,) in db.execute(select(Lead.linkedin_url).where(Lead.linkedin_url != "")).all()
+    }
+
+    novos: list[Lead] = []
+    ignorados = 0
+    for p in dados.perfis:
+        if p.linkedin_url and p.linkedin_url in urls_existentes:
+            ignorados += 1
+            continue
+        lead = Lead(
+            nome=p.nome or "(sem nome)",
+            headline=p.headline,
+            empresa=p.empresa,
+            cargo=p.cargo,
+            linkedin_url=p.linkedin_url,
+            origem="Busca LinkedIn",
+            status="NOVO",
+            notas=p.sobre,
+        )
+        db.add(lead)
+        novos.append(lead)
+        if p.linkedin_url:
+            urls_existentes.add(p.linkedin_url)
+
+    db.commit()
+    for lead in novos:
+        db.refresh(lead)
+
+    return ImportarResponse(
+        importados=len(novos),
+        ignorados=ignorados,
+        lead_ids=[l.id for l in novos],
+    )
 
 
 def _perfil_para_texto(p: PerfilLinkedIn) -> str:

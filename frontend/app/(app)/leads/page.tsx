@@ -110,7 +110,14 @@ export default function LeadsPage() {
       ) : leads.length === 0 ? (
         <div className="rounded-xl bg-white border border-slate-200 p-10 text-center">
           <Users className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-          <p className="text-ink-soft">Nenhum lead ainda. Clique em "Novo Lead".</p>
+          <p className="text-ink font-medium">Nenhum lead ainda</p>
+          <p className="text-ink-soft text-sm mt-1 max-w-md mx-auto">
+            O jeito normal é o Caçador trazer os leads do LinkedIn automaticamente.
+          </p>
+          <a href="/prospeccao" className="inline-flex items-center gap-2 rounded-lg bg-brand hover:bg-brand-dark text-white px-4 py-2 text-sm font-medium mt-4">
+            <Target className="h-4 w-4" /> Buscar leads no LinkedIn
+          </a>
+          <p className="text-xs text-ink-soft mt-3">ou use "Novo Lead" para cadastrar manualmente.</p>
         </div>
       ) : (
         <div className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
