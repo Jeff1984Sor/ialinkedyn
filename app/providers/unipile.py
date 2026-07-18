@@ -18,6 +18,8 @@ Endpoints usados:
 from __future__ import annotations
 
 import json
+import mimetypes
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -61,17 +63,39 @@ class UnipileProvider(LinkedInProvider):
         params: dict[str, Any] | None = None,
         json: dict[str, Any] | None = None,
         data: dict[str, Any] | None = None,
+        files: Any = None,
     ) -> Any:
         url = f"{self.base}{caminho}"
+        eh_multipart = data is not None or files is not None
+
+        # O Unipile exige multipart/form-data nesses endpoints. O httpx só
+        # monta multipart quando existe `files`; com apenas `data` ele manda
+        # x-www-form-urlencoded e a API recusa. Por isso convertemos os campos
+        # em partes de multipart (filename None = campo comum de formulário).
+        partes: dict[str, Any] | None = None
+        if eh_multipart:
+            partes = {}
+            for chave, valor in (data or {}).items():
+                if valor is None:
+                    continue
+                if isinstance(valor, (list, tuple)):
+                    # campos repetidos (ex.: attendees_ids)
+                    for i, item in enumerate(valor):
+                        partes[f"{chave}[{i}]"] = (None, str(item))
+                else:
+                    partes[chave] = (None, str(valor))
+            for chave, valor in (files or {}).items():
+                partes[chave] = valor
+
         try:
             with httpx.Client(timeout=TIMEOUT) as client:
                 resp = client.request(
                     metodo,
                     url,
-                    headers=self._headers(json=data is None),
+                    headers=self._headers(json=not eh_multipart),
                     params=params,
                     json=json,
-                    data=data,  # multipart/form-data quando data é usado
+                    files=partes,  # multipart/form-data (campos + anexos)
                 )
         except httpx.RequestError as e:
             raise HTTPException(status_code=502, detail=f"Falha ao falar com o Unipile: {e}")
@@ -413,13 +437,42 @@ class UnipileProvider(LinkedInProvider):
 
     # ------------------------------------------------------------------ post
 
-    def publicar_post(self, texto: str) -> str:
+    def publicar_post(self, texto: str, imagem_path: str = "") -> str:
+        """Publica no feed. Se houver imagem, vai como anexo (multipart)."""
         conta = self._exige_conta()
-        dados = self._req("POST", "/posts", data={"account_id": conta, "text": texto})
+        corpo = {"account_id": conta, "text": texto}
+
+        if imagem_path:
+            caminho = Path(imagem_path)
+            if not caminho.exists():
+                raise HTTPException(
+                    status_code=400, detail=f"Imagem não encontrada: {imagem_path}"
+                )
+            conteudo = caminho.read_bytes()
+            dados = self._req(
+                "POST",
+                "/posts",
+                data=corpo,
+                files={
+                    "attachments": (
+                        caminho.name,
+                        conteudo,
+                        _mime_da_imagem(caminho.name),
+                    )
+                },
+            )
+        else:
+            dados = self._req("POST", "/posts", data=corpo)
+
         return str(dados.get("post_id", "")) if isinstance(dados, dict) else ""
 
 
 # ---------------------------------------------------------------- utilidades
+
+
+def _mime_da_imagem(nome: str) -> str:
+    tipo, _ = mimetypes.guess_type(nome)
+    return tipo or "application/octet-stream"
 
 
 def _identificador_de_url(url_ou_id: str) -> str:

@@ -52,5 +52,5 @@ class MockProvider(LinkedInProvider):
     def enviar_mensagem(self, external_id: str, texto: str) -> bool:
         return True
 
-    def publicar_post(self, texto: str) -> str:
+    def publicar_post(self, texto: str, imagem_path: str = "") -> str:
         return "mock-urn:post:123"

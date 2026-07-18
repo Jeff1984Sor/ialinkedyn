@@ -58,6 +58,6 @@ class LinkedInProvider(ABC):
         ...
 
     @abstractmethod
-    def publicar_post(self, texto: str) -> str:
+    def publicar_post(self, texto: str, imagem_path: str = "") -> str:
         """Publica um post e devolve o identificador/URN."""
         ...
