@@ -27,7 +27,9 @@ from fastapi import HTTPException
 
 from app.providers.base import ConversaExterna, LinkedInProvider, PerfilLinkedIn
 
-TIMEOUT = 30.0
+# 30s era pouco: envio de imagem (multipart) e buscas grandes estouravam.
+TIMEOUT = 60.0
+TIMEOUT_UPLOAD = 180.0  # quando ha anexo
 
 # O LinkedIn recusa nota de convite acima disso (contas free têm limite menor
 # que o Premium; 200 é o valor seguro para todos).
@@ -87,8 +89,10 @@ class UnipileProvider(LinkedInProvider):
             for chave, valor in (files or {}).items():
                 partes[chave] = valor
 
+        # anexo demora mais para subir
+        tempo = TIMEOUT_UPLOAD if files else TIMEOUT
         try:
-            with httpx.Client(timeout=TIMEOUT) as client:
+            with httpx.Client(timeout=tempo) as client:
                 resp = client.request(
                     metodo,
                     url,
@@ -97,6 +101,15 @@ class UnipileProvider(LinkedInProvider):
                     json=json,
                     files=partes,  # multipart/form-data (campos + anexos)
                 )
+        except httpx.TimeoutException:
+            raise HTTPException(
+                status_code=504,
+                detail=(
+                    f"O Unipile demorou mais de {int(tempo)}s para responder. "
+                    "Isso costuma acontecer com imagens grandes — tente uma imagem "
+                    "menor, ou repita a operação em instantes."
+                ),
+            )
         except httpx.RequestError as e:
             raise HTTPException(status_code=502, detail=f"Falha ao falar com o Unipile: {e}")
 

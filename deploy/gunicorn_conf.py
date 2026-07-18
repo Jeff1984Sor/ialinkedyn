@@ -3,7 +3,8 @@
 bind = "127.0.0.1:8021"
 workers = 2
 worker_class = "uvicorn.workers.UvicornWorker"
-timeout = 60
+# publicar post com imagem e gerar imagem por IA passam de 60s
+timeout = 300
 graceful_timeout = 30
 keepalive = 5
 accesslog = "-"
