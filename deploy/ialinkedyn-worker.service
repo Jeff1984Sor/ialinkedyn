@@ -1,0 +1,14 @@
+[Unit]
+Description=IALinkedyn Worker (fila de abordagens, ritmo humano)
+After=network.target postgresql.service
+
+[Service]
+User=financeiro
+Group=financeiro
+WorkingDirectory=/home/financeiro/ialinkedyn
+ExecStart=/home/financeiro/ialinkedyn/.venv/bin/python -m app.worker.run
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

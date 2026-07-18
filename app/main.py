@@ -7,8 +7,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.routers import (
     agents,
+    audiences,
     auth,
     brand,
+    campanha,
     connection,
     conversations,
     dashboard,
@@ -52,3 +54,5 @@ app.include_router(agents.router)
 app.include_router(dashboard.router)
 app.include_router(connection.router)
 app.include_router(prompts.router)
+app.include_router(audiences.router)
+app.include_router(campanha.router)
