@@ -112,11 +112,31 @@ def atualizar_config(
     if dados.gemini_model is not None:
         cfg.gemini_model = dados.gemini_model or "gemini-2.5-flash"
     if dados.gemini_api_key is not None:
-        cfg.gemini_api_key_cifrado = cifra(dados.gemini_api_key.strip())
+        chave = dados.gemini_api_key.strip()
+        if chave.startswith("sk-"):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Essa é uma chave da OpenAI (começa com 'sk-'), não do Gemini. "
+                    "Troque o Motor de IA para OpenAI, ou cole uma chave do Google "
+                    "(começa com 'AIza')."
+                ),
+            )
+        cfg.gemini_api_key_cifrado = cifra(chave)
     if dados.openai_model is not None:
         cfg.openai_model = dados.openai_model or "gpt-4o"
     if dados.openai_api_key is not None:
-        cfg.openai_api_key_cifrado = cifra(dados.openai_api_key.strip())
+        chave = dados.openai_api_key.strip()
+        if chave.startswith("AIza"):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Essa é uma chave do Google Gemini (começa com 'AIza'), não da "
+                    "OpenAI. Troque o Motor de IA para Gemini, ou cole uma chave da "
+                    "OpenAI (começa com 'sk-')."
+                ),
+            )
+        cfg.openai_api_key_cifrado = cifra(chave)
 
     db.commit()
     return obter_config(db=db, _=user)

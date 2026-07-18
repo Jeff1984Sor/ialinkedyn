@@ -78,9 +78,10 @@ export default function ConexoesPage() {
 
   useEffect(() => { carregar().finally(() => setCarregando(false)); }, []);
 
-  async function salvarConfig() {
-    if (!config) return;
-    setSalvandoCfg(true); setOkCfg(false); setTeste(null);
+  async function salvarConfig(silencioso = false): Promise<boolean> {
+    if (!config) return false;
+    setSalvandoCfg(true);
+    if (!silencioso) { setOkCfg(false); setTeste(null); }
     try {
       const body: Record<string, unknown> = {
         linkedin_provider: config.linkedin_provider,
@@ -98,14 +99,18 @@ export default function ConexoesPage() {
       setConfig(c); setNovaGemini(""); setNovaOpenai(""); setNovaUnipile("");
       setStatus(await api<Status>("/connection/status"));
       setOkCfg(true); setTimeout(() => setOkCfg(false), 2500);
+      return true;
     } catch (e) {
       alert(e instanceof Error ? e.message : "Erro ao salvar");
+      return false;
     } finally {
       setSalvandoCfg(false);
     }
   }
 
   async function testarIA() {
+    // salva primeiro para nunca testar uma configuracao desatualizada
+    if (!(await salvarConfig(true))) return;
     setTestando(true); setTeste(null);
     try {
       setTeste(await api<{ ok: boolean; mensagem: string }>("/connection/testar-ia", { method: "POST" }));
@@ -117,6 +122,7 @@ export default function ConexoesPage() {
   }
 
   async function testarLinkedIn() {
+    if (!(await salvarConfig(true))) return;
     setTestandoLi(true); setTesteLi(null);
     try {
       setTesteLi(await api<{ ok: boolean; mensagem: string }>("/connection/testar-linkedin", { method: "POST" }));
@@ -242,8 +248,11 @@ export default function ConexoesPage() {
         )}
 
         <div className="flex items-center gap-3 flex-wrap">
+          <button onClick={() => salvarConfig()} disabled={salvandoCfg} className="flex items-center gap-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white px-5 py-2 text-sm font-medium disabled:opacity-60">
+            {salvandoCfg ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar IA
+          </button>
           <button onClick={testarIA} disabled={testando} className="flex items-center gap-2 rounded-lg border border-violet-300 text-violet-700 px-4 py-2 text-sm hover:bg-violet-50 disabled:opacity-60">
-            {testando ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />} Testar IA
+            {testando ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />} Salvar e testar
           </button>
           {teste && (
             <span className={`flex items-center gap-1 text-sm ${teste.ok ? "text-emerald-600" : "text-red-600"}`}>
@@ -287,11 +296,11 @@ export default function ConexoesPage() {
           </>
         )}
         <div className="flex items-center gap-3 flex-wrap">
-          <button onClick={salvarConfig} disabled={salvandoCfg} className="flex items-center gap-2 rounded-lg bg-brand hover:bg-brand-dark text-white px-5 py-2.5 text-sm font-medium disabled:opacity-60">
-            {salvandoCfg ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar configuracao
+          <button onClick={() => salvarConfig()} disabled={salvandoCfg} className="flex items-center gap-2 rounded-lg bg-brand hover:bg-brand-dark text-white px-5 py-2.5 text-sm font-medium disabled:opacity-60">
+            {salvandoCfg ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar provedor
           </button>
           <button onClick={testarLinkedIn} disabled={testandoLi} className="flex items-center gap-2 rounded-lg border border-brand/40 text-brand px-4 py-2.5 text-sm hover:bg-brand/5 disabled:opacity-60">
-            {testandoLi ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />} Testar conexao
+            {testandoLi ? <Loader2 className="h-4 w-4 animate-spin" /> : <FlaskConical className="h-4 w-4" />} Salvar e testar conexao
           </button>
           {okCfg && <span className="text-sm text-emerald-600">Salvo! OK</span>}
           {testeLi && (
