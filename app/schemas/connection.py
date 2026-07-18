@@ -36,6 +36,7 @@ class AutomationOut(BaseModel):
     modo_chat: str
     horario_inicio: int
     horario_fim: int
+    seguir_automatico: bool = False
 
 
 class AutomationUpdate(BaseModel):
@@ -45,6 +46,7 @@ class AutomationUpdate(BaseModel):
     modo_chat: str | None = Field(default=None, pattern="^(MANUAL|AUTO)$")
     horario_inicio: int | None = Field(default=None, ge=0, le=23)
     horario_fim: int | None = Field(default=None, ge=0, le=23)
+    seguir_automatico: bool | None = None
 
 
 class ConfigOut(BaseModel):

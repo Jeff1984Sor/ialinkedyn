@@ -44,7 +44,7 @@ class LinkedInProvider(ABC):
         ...
 
     @abstractmethod
-    def seguir(self, linkedin_url: str) -> bool:
+    def seguir(self, linkedin_url: str, provider_id: str = "") -> bool:
         ...
 
     @abstractmethod

@@ -15,7 +15,13 @@ from app.models.lead import Lead
 from app.models.outreach import OutreachStatus, OutreachTask
 from app.models.user import User
 from app.providers.unipile import LIMITE_NOTA_CONVITE
-from app.schemas.audience import CampanhaRequest, CampanhaResponse, FilaStatus, TarefaOut
+from app.schemas.audience import (
+    CampanhaLeadsRequest,
+    CampanhaRequest,
+    CampanhaResponse,
+    FilaStatus,
+    TarefaOut,
+)
 from app.services.brand import get_or_create_brand
 from app.services.dedup import achar_lead, url_canonica
 from app.services.ia import gerar
@@ -144,6 +150,105 @@ def enfileirar_campanha(
         limite_diario=limite,
         restante_hoje=restante,
         aviso=aviso,
+    )
+
+
+@router.post("/enfileirar-leads", response_model=CampanhaResponse)
+def enfileirar_leads(
+    dados: CampanhaLeadsRequest,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> CampanhaResponse:
+    """Envio em massa a partir do CRM: seleciona leads e a Maya escreve uma
+    abordagem personalizada para cada um."""
+    if not dados.lead_ids:
+        raise HTTPException(status_code=400, detail="Nenhum lead selecionado.")
+
+    brand = get_or_create_brand(db)
+    template = prompt_store.resolver(db, "cacador")
+
+    contexto_publico = ""
+    if dados.audience_id:
+        publico = db.get(Audience, dados.audience_id)
+        if publico and publico.descricao:
+            contexto_publico = f"\nContexto deste público: {publico.descricao}"
+
+    enfileirados = 0
+    ja_abordados = 0
+    sem_identificacao = 0
+
+    for lead_id in dados.lead_ids:
+        lead = db.get(Lead, lead_id)
+        if lead is None:
+            continue
+
+        # sem como identificar a pessoa no LinkedIn
+        if not lead.provider_id and not lead.linkedin_url:
+            sem_identificacao += 1
+            continue
+
+        existente = db.scalar(
+            select(OutreachTask).where(
+                OutreachTask.lead_id == lead.id,
+                OutreachTask.status.in_([OutreachStatus.PENDENTE, OutreachStatus.ENVIADO]),
+            )
+        )
+        if existente:
+            ja_abordados += 1
+            continue
+
+        perfil_texto = "\n".join(
+            filter(
+                None,
+                [
+                    f"Nome: {lead.nome}",
+                    f"Headline: {lead.headline}" if lead.headline else "",
+                    f"Empresa: {lead.empresa}" if lead.empresa else "",
+                    f"Cargo: {lead.cargo}" if lead.cargo else "",
+                    f"Notas: {lead.notas}" if lead.notas else "",
+                    contexto_publico,
+                ],
+            )
+        )
+        prompt = montar_cacador(template, brand, perfil_texto)
+        if dados.tipo == "CONVITE":
+            prompt += (
+                f"\n\nRESTRIÇÃO CRÍTICA: esta mensagem é a nota de um CONVITE de conexão "
+                f"do LinkedIn, que aceita no máximo {LIMITE_NOTA_CONVITE} caracteres. "
+                f"Escreva bem curto — 1 a 2 frases. Não ultrapasse esse limite."
+            )
+        mensagem = gerar(db, prompt)
+        if dados.tipo == "CONVITE" and len(mensagem) > LIMITE_NOTA_CONVITE:
+            mensagem = mensagem[: LIMITE_NOTA_CONVITE - 3].rstrip() + "..."
+
+        enfileirar(db, lead.id, mensagem, tipo=dados.tipo, audience_id=dados.audience_id)
+        enfileirados += 1
+
+    cfg = get_settings(db)
+    restante = restante_hoje(db)
+
+    avisos = []
+    if sem_identificacao:
+        avisos.append(
+            f"{sem_identificacao} lead(s) sem URL do LinkedIn foram pulados "
+            "(importe-os pela busca para ter o identificador)."
+        )
+    if enfileirados > restante:
+        avisos.append(
+            f"O limite de hoje permite {restante} envios; o restante sai nos próximos dias."
+        )
+    elif not dentro_do_horario(cfg):
+        avisos.append(
+            f"Fora do horário ({cfg.horario_inicio}h-{cfg.horario_fim}h) — o envio começa na janela."
+        )
+
+    return CampanhaResponse(
+        enfileirados=enfileirados,
+        leads_criados=0,
+        ja_abordados=ja_abordados,
+        limite_diario=limite_diario(cfg),
+        restante_hoje=restante,
+        aviso=" ".join(avisos),
     )
 
 

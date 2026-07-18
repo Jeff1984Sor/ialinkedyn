@@ -54,6 +54,8 @@ class BuscarResponse(BaseModel):
     provider: str
     simulado: bool
     perfis: list[PerfilEncontrado] = []
+    # quantos entraram na fila de 'seguir' automaticamente
+    seguindo_automaticamente: int = 0
 
 
 class ImportarRequest(BaseModel):

@@ -27,6 +27,8 @@ from app.schemas.agent import (
 )
 from app.services.brand import get_or_create_brand
 from app.services.config_service import get_provider_name
+from app.services.growth import enfileirar_follows
+from app.services.outreach import get_settings
 from app.services.dedup import achar_lead, normalizar_url, url_canonica
 from app.services.ia import gerar
 from app.services.knowledge_search import buscar_relevantes
@@ -166,12 +168,22 @@ def buscar(
         for p in encontrados
     ]
 
+    # seguir automático: se ligado, já enfileira o follow de todo mundo
+    seguidos = 0
+    cfg_auto = get_settings(db)
+    if cfg_auto.seguir_automatico:
+        try:
+            seguidos = enfileirar_follows(db, perfis)
+        except Exception:  # não derruba a busca se o follow falhar
+            seguidos = 0
+
     nome_provider = get_provider_name(db)
     return BuscarResponse(
         termo_usado=termo,
         provider=nome_provider,
         simulado=(nome_provider == "mock"),
         perfis=perfis,
+        seguindo_automaticamente=seguidos,
     )
 
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Plus, Trash2, X, Users, Loader2, Target, Copy, Check } from "lucide-react";
+import { Plus, Trash2, X, Users, Loader2, Target, Copy, Check, Send, ShieldAlert } from "lucide-react";
 
 type Lead = {
   id: number;
@@ -37,6 +37,11 @@ export default function LeadsPage() {
   const [aberto, setAberto] = useState(false);
   const [form, setForm] = useState<typeof VAZIO>(VAZIO);
   const [salvando, setSalvando] = useState(false);
+
+  // selecao em massa
+  const [selecionados, setSelecionados] = useState<Set<number>>(new Set());
+  const [tipoMassa, setTipoMassa] = useState<"CONVITE" | "MENSAGEM" | "INMAIL">("CONVITE");
+  const [enviandoMassa, setEnviandoMassa] = useState(false);
 
   // modal de abordagem gerada
   const [abordagem, setAbordagem] = useState<string | null>(null);
@@ -76,6 +81,40 @@ export default function LeadsPage() {
     if (!confirm("Excluir este lead?")) return;
     await api(`/leads/${id}`, { method: "DELETE" });
     await carregar();
+  }
+
+  function alternarSel(id: number) {
+    const novo = new Set(selecionados);
+    novo.has(id) ? novo.delete(id) : novo.add(id);
+    setSelecionados(novo);
+  }
+
+  async function enviarEmMassa() {
+    if (selecionados.size === 0) return;
+    if (!confirm(
+      `A Maya vai escrever uma abordagem personalizada para ${selecionados.size} lead(s) e colocar na fila.\n\n` +
+      `O envio e gradual, respeitando seu limite diario. Continuar?`
+    )) return;
+
+    setEnviandoMassa(true);
+    try {
+      const r = await api<{ enfileirados: number; ja_abordados: number; restante_hoje: number; limite_diario: number; aviso: string }>(
+        "/campanha/enfileirar-leads",
+        { method: "POST", body: { lead_ids: Array.from(selecionados), tipo: tipoMassa } }
+      );
+      alert(
+        `${r.enfileirados} abordagem(ns) na fila!\n` +
+        (r.ja_abordados ? `${r.ja_abordados} ja tinham sido abordados.\n` : "") +
+        `Restam ${r.restante_hoje} envios hoje (limite ${r.limite_diario}).` +
+        (r.aviso ? `\n\n${r.aviso}` : "")
+      );
+      setSelecionados(new Set());
+      await carregar();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Erro ao enfileirar");
+    } finally {
+      setEnviandoMassa(false);
+    }
   }
 
   async function gerarAbordagem(lead: Lead) {
@@ -120,10 +159,41 @@ export default function LeadsPage() {
           <p className="text-xs text-ink-soft mt-3">ou use "Novo Lead" para cadastrar manualmente.</p>
         </div>
       ) : (
+        <div className="space-y-3">
+        {/* barra de envio em massa */}
+        <div className="rounded-xl bg-white border border-slate-200 shadow-sm p-4 flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-ink">
+            <input type="checkbox" className="h-4 w-4 accent-brand"
+              checked={selecionados.size === leads.length && leads.length > 0}
+              onChange={(e) => setSelecionados(e.target.checked ? new Set(leads.map((l) => l.id)) : new Set())} />
+            Selecionar todos ({leads.length})
+          </label>
+
+          <span className="text-sm text-ink-soft">{selecionados.size} selecionado(s)</span>
+
+          <select value={tipoMassa} onChange={(e) => setTipoMassa(e.target.value as "CONVITE" | "MENSAGEM" | "INMAIL")}
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand">
+            <option value="CONVITE">Convite de conexao</option>
+            <option value="MENSAGEM">Mensagem no chat (so conexoes)</option>
+            <option value="INMAIL">InMail (consome credito)</option>
+          </select>
+
+          <button onClick={enviarEmMassa} disabled={enviandoMassa || selecionados.size === 0}
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm font-medium disabled:opacity-50">
+            {enviandoMassa ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            Enviar abordagem em massa
+          </button>
+
+          <span className="flex items-center gap-1 text-xs text-ink-soft">
+            <ShieldAlert className="h-3.5 w-3.5 text-amber-500" /> envio gradual, respeitando o limite diario
+          </span>
+        </div>
+
         <div className="rounded-xl bg-white border border-slate-200 shadow-sm overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-ink-soft">
               <tr>
+                <th className="w-10 px-4 py-3"></th>
                 <th className="text-left px-4 py-3 font-medium">Nome</th>
                 <th className="text-left px-4 py-3 font-medium">Empresa / Cargo</th>
                 <th className="text-left px-4 py-3 font-medium">Status</th>
@@ -133,6 +203,10 @@ export default function LeadsPage() {
             <tbody>
               {leads.map((l) => (
                 <tr key={l.id} className="border-t border-slate-100">
+                  <td className="px-4 py-3">
+                    <input type="checkbox" className="h-4 w-4 accent-brand"
+                      checked={selecionados.has(l.id)} onChange={() => alternarSel(l.id)} />
+                  </td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-ink">{l.nome}</p>
                     {l.headline && <p className="text-xs text-ink-soft">{l.headline}</p>}
@@ -155,6 +229,7 @@ export default function LeadsPage() {
               ))}
             </tbody>
           </table>
+        </div>
         </div>
       )}
 

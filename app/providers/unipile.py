@@ -185,16 +185,45 @@ class UnipileProvider(LinkedInProvider):
         self._req("POST", "/users/invite", json=corpo)
         return True
 
-    def seguir(self, linkedin_url: str) -> bool:
-        """A API do Unipile não expõe 'seguir' isolado — usamos o convite,
-        que é a ação equivalente de aproximação no LinkedIn."""
-        raise HTTPException(
-            status_code=501,
-            detail=(
-                "'Seguir' não é exposto pela API do Unipile. Use 'Enviar convite' "
-                "(conexão), que é a ação equivalente."
-            ),
+    def seguir(self, linkedin_url: str, provider_id: str = "") -> bool:
+        """Segue a pessoa SEM precisar de convite.
+
+        O Unipile não tem um endpoint dedicado de follow, mas expõe
+        POST /linkedin (raw), que encaminha chamadas para a API interna do
+        LinkedIn. Usamos o endpoint de followingStates.
+
+        ⚠️ API interna: não é documentada e pode mudar sem aviso.
+        """
+        conta = self._exige_conta()
+
+        pid = (provider_id or "").strip()
+        if not pid:
+            pid = self.obter_perfil(linkedin_url).provider_id
+        if not pid:
+            raise HTTPException(
+                status_code=400,
+                detail="Não consegui identificar a pessoa para seguir.",
+            )
+
+        # o urn pode vir completo ou só o id
+        urn = pid if pid.startswith("urn:li:") else f"urn:li:fsd_profile:{pid}"
+        alvo = f"urn:li:fsd_followingState:urn:li:fsu_profileFollowingState:{urn}"
+
+        self._req(
+            "POST",
+            "/linkedin",
+            json={
+                "account_id": conta,
+                "method": "POST",
+                "request_url": (
+                    "https://www.linkedin.com/voyager/api/feed/dash/followingStates/"
+                    + alvo
+                ),
+                "body": {"patch": {"$set": {"following": True}}},
+                "headers": {"x-http-method-override": "PATCH"},
+            },
         )
+        return True
 
     # ------------------------------------------------------------------ chat
 
@@ -315,11 +344,20 @@ def _identificador_de_url(url_ou_id: str) -> str:
     return valor
 
 
+_LIXO_NOME = {"undefined", "null", "none", "n/a", ""}
+
+
+def _parte_nome(valor: Any) -> str:
+    """Descarta valores-lixo que o LinkedIn às vezes devolve."""
+    texto = str(valor or "").strip()
+    return "" if texto.lower() in _LIXO_NOME else texto
+
+
 def _para_perfil(d: dict[str, Any]) -> PerfilLinkedIn:
     """Converte o JSON do Unipile no nosso PerfilLinkedIn."""
     nome = " ".join(
-        p for p in [d.get("first_name"), d.get("last_name")] if p
-    ).strip() or str(d.get("name") or "")
+        p for p in [_parte_nome(d.get("first_name")), _parte_nome(d.get("last_name"))] if p
+    ).strip() or _parte_nome(d.get("name"))
 
     empresa = ""
     cargo = ""

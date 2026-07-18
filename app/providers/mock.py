@@ -41,7 +41,7 @@ class MockProvider(LinkedInProvider):
                 return p
         return PerfilLinkedIn(nome="Perfil (simulado)", linkedin_url=linkedin_url)
 
-    def seguir(self, linkedin_url: str) -> bool:
+    def seguir(self, linkedin_url: str, provider_id: str = "") -> bool:
         return True
 
     def enviar_convite(

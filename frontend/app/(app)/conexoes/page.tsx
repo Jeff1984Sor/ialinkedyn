@@ -44,6 +44,7 @@ type Limites = {
   modo_chat: string;
   horario_inicio: number;
   horario_fim: number;
+  seguir_automatico: boolean;
 };
 
 const input = "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand";
@@ -461,6 +462,18 @@ export default function ConexoesPage() {
             </select>
           </div>
         </div>
+
+        <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-3 cursor-pointer hover:bg-slate-50">
+          <input type="checkbox" className="h-4 w-4 accent-brand mt-0.5"
+            checked={limites.seguir_automatico} onChange={(e) => setL("seguir_automatico", e.target.checked)} />
+          <div>
+            <p className="text-sm font-medium text-ink">Seguir automaticamente</p>
+            <p className="text-xs text-ink-soft mt-0.5">
+              Toda pessoa que aparecer na busca passa a ser seguida sozinha (sem convite e sem mensagem),
+              respeitando o limite de follows/dia acima. Bom para aparecer no radar antes de abordar.
+            </p>
+          </div>
+        </label>
 
         <div className="flex items-center gap-3 pt-1">
           <button onClick={salvarLimites} disabled={salvandoLim} className="flex items-center gap-2 rounded-lg bg-brand hover:bg-brand-dark text-white px-5 py-2.5 text-sm font-medium disabled:opacity-60">

@@ -45,6 +45,14 @@ class CampanhaRequest(BaseModel):
     tipo: str = Field(default="CONVITE", pattern="^(CONVITE|MENSAGEM|INMAIL)$")
 
 
+class CampanhaLeadsRequest(BaseModel):
+    """Enfileira abordagens para leads que já estão no CRM."""
+
+    lead_ids: list[int]
+    audience_id: int | None = None
+    tipo: str = Field(default="CONVITE", pattern="^(CONVITE|MENSAGEM|INMAIL)$")
+
+
 class CampanhaResponse(BaseModel):
     enfileirados: int
     leads_criados: int

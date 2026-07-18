@@ -39,6 +39,8 @@ class AutomationSettings(Base):
     limite_mensagens_dia: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
     # MANUAL = aprovar-e-enviar | AUTO = IA responde sozinha
     modo_chat: Mapped[str] = mapped_column(String(10), default="MANUAL", nullable=False)
+    # seguir sozinho todo mundo que aparecer na busca
+    seguir_automatico: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     horario_inicio: Mapped[int] = mapped_column(Integer, default=9, nullable=False)   # hora (0-23)
     horario_fim: Mapped[int] = mapped_column(Integer, default=18, nullable=False)
     atualizado_em: Mapped[datetime] = mapped_column(

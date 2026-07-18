@@ -19,7 +19,7 @@ type Perfil = {
   ja_importado: boolean;
 };
 
-type BuscaResp = { termo_usado: string; provider: string; simulado: boolean; perfis: Perfil[] };
+type BuscaResp = { termo_usado: string; provider: string; simulado: boolean; perfis: Perfil[]; seguindo_automaticamente: number };
 type Publico = { id: number; nome: string; termo: string; descricao: string; ativo: boolean };
 type CampanhaResp = {
   enfileirados: number; leads_criados: number; ja_abordados: number;

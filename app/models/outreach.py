@@ -21,6 +21,7 @@ class OutreachTipo:
     MENSAGEM = "MENSAGEM"    # mensagem direta no chat (para quem já é conexão)
     INMAIL = "INMAIL"        # mensagem para não-conexão usando crédito de InMail
     FOLLOWUP = "FOLLOWUP"    # 1ª mensagem automática após o convite ser aceito
+    SEGUIR = "SEGUIR"        # seguir a pessoa (sem convite)
 
 
 class OutreachTask(Base):

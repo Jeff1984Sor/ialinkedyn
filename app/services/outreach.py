@@ -38,11 +38,22 @@ def _inicio_do_dia_utc() -> datetime:
     return inicio_br.astimezone(timezone.utc)
 
 
-def enviados_hoje(db: Session) -> int:
+def enviados_hoje(db: Session, apenas_mensagens: bool = False) -> int:
+    stmt = select(func.count(OutreachTask.id)).where(
+        OutreachTask.status == OutreachStatus.ENVIADO,
+        OutreachTask.enviado_em >= _inicio_do_dia_utc(),
+    )
+    if apenas_mensagens:
+        stmt = stmt.where(OutreachTask.tipo != OutreachTipo.SEGUIR)
+    return db.scalar(stmt) or 0
+
+
+def seguidos_hoje(db: Session) -> int:
     return (
         db.scalar(
             select(func.count(OutreachTask.id)).where(
                 OutreachTask.status == OutreachStatus.ENVIADO,
+                OutreachTask.tipo == OutreachTipo.SEGUIR,
                 OutreachTask.enviado_em >= _inicio_do_dia_utc(),
             )
         )
@@ -64,8 +75,15 @@ def limite_diario(cfg: AutomationSettings) -> int:
 
 
 def restante_hoje(db: Session) -> int:
+    """Quanto ainda dá para MENSAGEAR hoje (convite/mensagem/inmail)."""
     cfg = get_settings(db)
-    return max(0, limite_diario(cfg) - enviados_hoje(db))
+    return max(0, limite_diario(cfg) - enviados_hoje(db, apenas_mensagens=True))
+
+
+def restante_follows_hoje(db: Session) -> int:
+    """Seguir tem cota própria — não consome a cota de mensagens."""
+    cfg = get_settings(db)
+    return max(0, cfg.limite_follows_dia - seguidos_hoje(db))
 
 
 def enfileirar(
@@ -127,7 +145,9 @@ def enviar_tarefa(db: Session, tarefa: OutreachTask) -> bool:
         # o id interno pode já estar salvo no lead (vindo da busca)
         pid = (lead.provider_id or "").strip()
 
-        if tarefa.tipo in (OutreachTipo.MENSAGEM, OutreachTipo.FOLLOWUP, OutreachTipo.INMAIL):
+        if tarefa.tipo == OutreachTipo.SEGUIR:
+            provider.seguir(lead.linkedin_url, provider_id=pid)
+        elif tarefa.tipo in (OutreachTipo.MENSAGEM, OutreachTipo.FOLLOWUP, OutreachTipo.INMAIL):
             if not pid:
                 pid = provider.obter_perfil(lead.linkedin_url).provider_id
                 lead.provider_id = pid
@@ -143,6 +163,13 @@ def enviar_tarefa(db: Session, tarefa: OutreachTask) -> bool:
         tarefa.status = OutreachStatus.ENVIADO
         tarefa.enviado_em = datetime.now(timezone.utc)
         tarefa.erro = ""
+
+        # seguir não é conversa: só marca o lead
+        if tarefa.tipo == OutreachTipo.SEGUIR:
+            if lead.status == LeadStatus.NOVO.value:
+                lead.status = LeadStatus.SEGUINDO.value
+            db.commit()
+            return True
 
         # reflete no CRM
         _registrar_conversa(db, lead, tarefa.mensagem)
@@ -175,17 +202,33 @@ def processar_fila(db: Session, maximo: int = 1) -> dict:
     if not dentro_do_horario(cfg):
         return {"enviados": 0, "motivo": "fora do horário de trabalho"}
 
-    disponivel = restante_hoje(db)
-    if disponivel <= 0:
+    pode_mensagem = restante_hoje(db) > 0
+    pode_seguir = restante_follows_hoje(db) > 0
+
+    if not pode_mensagem and not pode_seguir:
         return {"enviados": 0, "motivo": "limite diário atingido"}
 
-    quantidade = min(maximo, disponivel)
+    # só pega da fila o que ainda cabe na cota de cada tipo
+    tipos_liberados: list[str] = []
+    if pode_mensagem:
+        tipos_liberados += [
+            OutreachTipo.CONVITE,
+            OutreachTipo.MENSAGEM,
+            OutreachTipo.FOLLOWUP,
+            OutreachTipo.INMAIL,
+        ]
+    if pode_seguir:
+        tipos_liberados.append(OutreachTipo.SEGUIR)
+
     pendentes = list(
         db.scalars(
             select(OutreachTask)
-            .where(OutreachTask.status == OutreachStatus.PENDENTE)
+            .where(
+                OutreachTask.status == OutreachStatus.PENDENTE,
+                OutreachTask.tipo.in_(tipos_liberados),
+            )
             .order_by(OutreachTask.criado_em)
-            .limit(quantidade)
+            .limit(maximo)
         )
     )
     if not pendentes:

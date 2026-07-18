@@ -113,6 +113,57 @@ def detectar_aceites(db: Session) -> dict:
     return {"aceites": aceites, "followups": followups, "motivo": "ok"}
 
 
+def enfileirar_follows(db: Session, perfis: list, audience_id: int | None = None) -> int:
+    """Coloca na fila o 'seguir' de cada perfil (sem convite, sem mensagem).
+
+    Usado quando o 'seguir automático' está ligado: tudo que a busca encontrar
+    passa a ser seguido sozinho, respeitando o limite diário de follows.
+    """
+    from app.services.dedup import achar_lead, url_canonica
+
+    enfileirados = 0
+    for p in perfis:
+        provider_id = getattr(p, "provider_id", "") or ""
+        linkedin_url = getattr(p, "linkedin_url", "") or ""
+        if not provider_id and not linkedin_url:
+            continue
+
+        lead = achar_lead(db, provider_id, linkedin_url)
+        if lead is None:
+            lead = Lead(
+                nome=getattr(p, "nome", "") or "(sem nome)",
+                headline=getattr(p, "headline", "") or "",
+                empresa=getattr(p, "empresa", "") or "",
+                cargo=getattr(p, "cargo", "") or "",
+                linkedin_url=url_canonica(linkedin_url) or linkedin_url,
+                provider_id=provider_id,
+                origem="Seguir automático",
+                status=LeadStatus.NOVO.value,
+            )
+            db.add(lead)
+            db.commit()
+            db.refresh(lead)
+        elif provider_id and not lead.provider_id:
+            lead.provider_id = provider_id
+            db.commit()
+
+        # já seguido / já na fila?
+        ja = db.scalar(
+            select(OutreachTask).where(
+                OutreachTask.lead_id == lead.id,
+                OutreachTask.tipo == OutreachTipo.SEGUIR,
+                OutreachTask.status.in_([OutreachStatus.PENDENTE, OutreachStatus.ENVIADO]),
+            )
+        )
+        if ja or lead.status == LeadStatus.SEGUINDO.value:
+            continue
+
+        enfileirar(db, lead.id, "", tipo=OutreachTipo.SEGUIR, audience_id=audience_id)
+        enfileirados += 1
+
+    return enfileirados
+
+
 def sincronizar_conexoes(db: Session, paginas: int = 5) -> dict:
     """Traz suas conexões do LinkedIn para o CRM (sem duplicar)."""
     provider = get_provider(db)
