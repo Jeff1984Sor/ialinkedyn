@@ -7,6 +7,7 @@ import random
 from app.core.database import SessionLocal
 from app.services.growth import detectar_aceites
 from app.services.outreach import processar_fila
+from app.services.publisher import publicar_agendados
 
 log = logging.getLogger("ialinkedyn.worker")
 
@@ -45,5 +46,18 @@ def job_detectar_aceites() -> None:
             )
     except Exception:  # pragma: no cover
         log.exception("Falha ao detectar aceites")
+    finally:
+        db.close()
+
+
+def job_publicar_posts() -> None:
+    """Publica no feed os posts cujo horário agendado chegou."""
+    db = SessionLocal()
+    try:
+        r = publicar_agendados(db)
+        if r["publicados"]:
+            log.info("Posts publicados: %s", r["publicados"])
+    except Exception:  # pragma: no cover
+        log.exception("Falha ao publicar posts agendados")
     finally:
         db.close()

@@ -14,6 +14,8 @@ LABELS: dict[str, str] = {
     "atendente": "💬 Atendente — responder mensagens do chat",
     "cacador": "🎯 Caçador — 1ª abordagem personalizada",
     "followup": "🤝 Follow-up — 1ª mensagem quando aceitam o convite",
+    "perfil": "👤 Perfil — otimizar seu título e o 'Sobre' do LinkedIn",
+    "criador": "✍️ Criador — escrever post para o feed",
 }
 
 # Marcadores disponíveis em cada prompt (mostrados na UI como ajuda)
@@ -21,6 +23,8 @@ PLACEHOLDERS: dict[str, list[str]] = {
     "atendente": ["{{contexto_marca}}", "{{banco_qa}}", "{{historico}}", "{{mensagem_lead}}", "{{assinatura}}"],
     "cacador": ["{{contexto_marca}}", "{{perfil}}"],
     "followup": ["{{contexto_marca}}", "{{perfil}}"],
+    "perfil": ["{{contexto_marca}}", "{{perfil_atual}}"],
+    "criador": ["{{contexto_marca}}", "{{tema}}"],
 }
 
 DEFAULTS: dict[str, str] = {
@@ -104,6 +108,53 @@ PROIBIDO:
 - Texto longo ou com cara de modelo pronto.
 
 Responda APENAS com o texto da mensagem (sem aspas, sem explicações).""",
+"perfil": """{{contexto_marca}}
+
+PERFIL ATUAL DO LINKEDIN (do dono da conta):
+{{perfil_atual}}
+
+TAREFA: Reescreva o TÍTULO (headline) e a seção SOBRE (summary) do perfil para
+atrair o público ideal descrito acima.
+
+REGRAS DO TÍTULO:
+- Máximo 200 caracteres.
+- Diga o que a empresa resolve e para quem — não só o cargo.
+- Nada de lista de buzzwords separadas por "|".
+
+REGRAS DO SOBRE:
+- 3 a 5 parágrafos curtos, em primeira pessoa, português do Brasil.
+- Comece pela DOR do cliente ideal, não pela sua biografia.
+- Mostre o que a empresa entrega e por que confiar (prova/cases).
+- Termine com uma chamada para ação clara.
+- Sem clichê corporativo, sem emoji em excesso, sem prometer prazo fixo nem preço.
+
+FORMATO DA RESPOSTA (exatamente assim, sem mais nada):
+TITULO: <o novo título>
+SOBRE:
+<o novo texto do sobre>""",
+
+    "criador": """{{contexto_marca}}
+
+TEMA DO POST:
+{{tema}}
+
+TAREFA: Escreva um post para o feed do LinkedIn sobre esse tema.
+
+ESTRUTURA:
+- Primeira linha: um gancho que faça parar a rolagem (uma frase, sem clickbait).
+- Corpo: 3 a 6 parágrafos MUITO curtos (1 a 2 linhas cada), com quebras de linha
+  entre eles — é assim que se lê bem no feed.
+- Traga algo concreto: um exemplo, um número real do contexto, uma situação do dia a dia.
+- Última linha: uma pergunta para o leitor comentar, ou um convite leve.
+
+REGRAS:
+- Português do Brasil, tom da marca, escrito como gente.
+- Entre 700 e 1300 caracteres no total.
+- No máximo 3 hashtags no final, relevantes.
+- PROIBIDO: "Cansado de...", "Você sabia que...", "Deixa eu te contar", textão em
+  bloco único, promessa de prazo fixo ou preço, e inventar dado que não foi informado.
+
+Responda APENAS com o texto do post (sem aspas, sem título, sem explicações).""",
 }
 
 
@@ -160,6 +211,20 @@ def montar_atendente(
             "mensagem_lead": mensagem_lead,
             "assinatura": assinatura,
         },
+    )
+
+
+def montar_perfil(template: str, brand: BrandVoice, perfil_atual: str) -> str:
+    return _preencher(
+        template,
+        {"contexto_marca": contexto_marca(brand), "perfil_atual": perfil_atual},
+    )
+
+
+def montar_criador(template: str, brand: BrandVoice, tema: str) -> str:
+    return _preencher(
+        template,
+        {"contexto_marca": contexto_marca(brand), "tema": tema},
     )
 
 

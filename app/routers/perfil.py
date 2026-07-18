@@ -7,10 +7,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.agents import prompt_store
+from app.agents.prompts import montar_perfil
 from app.core.deps import get_current_user, get_db
 from app.models.lead import Lead
 from app.models.user import User
 from app.providers.factory import get_provider
+from app.services.brand import get_or_create_brand
+from app.services.ia import gerar
 
 router = APIRouter(prefix="/perfil", tags=["perfil"])
 
@@ -68,6 +72,106 @@ def _periodo(d: dict[str, Any]) -> str:
     if a:
         return f"{a} - atual"
     return b
+
+
+class MeuPerfil(BaseModel):
+    nome: str = ""
+    headline: str = ""
+    summary: str = ""
+    foto_url: str = ""
+    aviso: str = ""
+
+
+class SugestaoPerfil(BaseModel):
+    headline: str = ""
+    summary: str = ""
+    headline_atual: str = ""
+    summary_atual: str = ""
+
+
+class AplicarPerfil(BaseModel):
+    headline: str = ""
+    summary: str = ""
+
+
+def _meu_provider(db: Session):
+    provider = get_provider(db)
+    if getattr(provider, "obter_meu_perfil", None) is None:
+        raise HTTPException(
+            status_code=501,
+            detail="O provedor atual não acessa seu perfil. Configure o Unipile em Conexões.",
+        )
+    return provider
+
+
+@router.get("/meu", response_model=MeuPerfil)
+def meu_perfil(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> MeuPerfil:
+    """Seu perfil atual do LinkedIn (título e 'Sobre')."""
+    d = _meu_provider(db).obter_meu_perfil()
+    nome = " ".join(
+        p for p in [_texto(d.get("first_name")), _texto(d.get("last_name"))] if p
+    ) or _texto(d.get("name"))
+    return MeuPerfil(
+        nome=nome,
+        headline=_texto(d.get("headline")),
+        summary=_texto(d.get("summary") or d.get("about")),
+        foto_url=_texto(d.get("profile_picture_url")),
+    )
+
+
+@router.post("/meu/melhorar", response_model=SugestaoPerfil)
+def melhorar_meu_perfil(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> SugestaoPerfil:
+    """A IA reescreve seu título e 'Sobre' mirando o seu público ideal."""
+    atual = meu_perfil(db=db, _=_)
+
+    perfil_atual = (
+        f"Nome: {atual.nome}\n"
+        f"Título atual: {atual.headline or '(vazio)'}\n"
+        f"Sobre atual: {atual.summary or '(vazio)'}"
+    )
+
+    brand = get_or_create_brand(db)
+    template = prompt_store.resolver(db, "perfil")
+    resposta = gerar(db, montar_perfil(template, brand, perfil_atual))
+
+    # a IA responde no formato "TITULO: ... / SOBRE: ..."
+    headline, summary = "", ""
+    if "SOBRE:" in resposta:
+        parte_titulo, parte_sobre = resposta.split("SOBRE:", 1)
+        headline = parte_titulo.replace("TITULO:", "").replace("TÍTULO:", "").strip()
+        summary = parte_sobre.strip()
+    else:
+        summary = resposta.strip()
+
+    return SugestaoPerfil(
+        headline=headline[:200],
+        summary=summary,
+        headline_atual=atual.headline,
+        summary_atual=atual.summary,
+    )
+
+
+@router.put("/meu", response_model=MeuPerfil)
+def aplicar_meu_perfil(
+    dados: AplicarPerfil,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> MeuPerfil:
+    """Grava o novo título/'Sobre' no seu LinkedIn de verdade."""
+    provider = _meu_provider(db)
+    editar = getattr(provider, "editar_meu_perfil", None)
+    if editar is None:
+        raise HTTPException(status_code=501, detail="Provedor não permite editar o perfil.")
+    if not dados.headline and not dados.summary:
+        raise HTTPException(status_code=400, detail="Nada para atualizar.")
+    editar(headline=dados.headline[:200], summary=dados.summary)
+    return meu_perfil(db=db, _=user)
 
 
 @router.get("/lead/{lead_id}", response_model=PerfilCompleto)

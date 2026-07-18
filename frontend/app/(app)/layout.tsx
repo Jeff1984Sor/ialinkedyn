@@ -15,6 +15,8 @@ import {
   FileText,
   Link2,
   Network,
+  PenLine,
+  UserCog,
   LogOut,
   Loader2,
 } from "lucide-react";
@@ -28,6 +30,7 @@ const NAV = [
       { href: "/leads", label: "Leads", icon: Users },
       { href: "/prospeccao", label: "Prospecção", icon: Target },
       { href: "/rede", label: "Minha Rede", icon: Network },
+      { href: "/conteudo", label: "Conteúdo", icon: PenLine },
     ],
   },
   {
@@ -36,6 +39,7 @@ const NAV = [
       { href: "/conhecimento", label: "Base de Conhecimento", icon: BookOpen },
       { href: "/marca", label: "Marca / Voz", icon: Sparkles },
       { href: "/prompts", label: "Prompts", icon: FileText },
+      { href: "/meu-perfil", label: "Meu Perfil", icon: UserCog },
     ],
   },
   {

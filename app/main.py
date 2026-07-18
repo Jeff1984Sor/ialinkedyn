@@ -17,6 +17,7 @@ from app.routers import (
     knowledge,
     leads,
     perfil,
+    posts,
     prompts,
     rede,
 )
@@ -60,3 +61,4 @@ app.include_router(audiences.router)
 app.include_router(campanha.router)
 app.include_router(rede.router)
 app.include_router(perfil.router)
+app.include_router(posts.router)

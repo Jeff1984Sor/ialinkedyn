@@ -348,6 +348,27 @@ class UnipileProvider(LinkedInProvider):
         dados = self._req("POST", "/chats", data=corpo)
         return str(dados.get("chat_id", "")) if isinstance(dados, dict) else ""
 
+    # ------------------------------------------------------- perfil próprio
+
+    def obter_meu_perfil(self) -> dict[str, Any]:
+        """Dados do dono da conta conectada (headline, summary, etc.)."""
+        conta = self._exige_conta()
+        dados = self._req("GET", "/users/me", params={"account_id": conta})
+        return dados if isinstance(dados, dict) else {}
+
+    def editar_meu_perfil(self, headline: str = "", summary: str = "") -> bool:
+        """Atualiza o próprio perfil do LinkedIn (título e seção 'Sobre')."""
+        conta = self._exige_conta()
+        corpo: dict[str, Any] = {"type": "LINKEDIN", "account_id": conta}
+        if headline:
+            corpo["headline"] = headline
+        if summary:
+            corpo["summary"] = summary
+        if len(corpo) == 2:
+            raise HTTPException(status_code=400, detail="Nada para atualizar.")
+        self._req("PATCH", "/users/me/edit", data=corpo)
+        return True
+
     # ------------------------------------------------------- rede / convites
 
     def listar_relacoes(self, limite: int = 100, cursor: str = "") -> tuple[list[PerfilLinkedIn], str]:
