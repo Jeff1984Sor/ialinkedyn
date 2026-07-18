@@ -8,6 +8,7 @@ from app.core.database import SessionLocal
 from app.services.growth import detectar_aceites
 from app.services.outreach import processar_fila
 from app.services.publisher import publicar_agendados
+from app.services.recorrencia import processar_recorrencias
 
 log = logging.getLogger("ialinkedyn.worker")
 
@@ -59,5 +60,18 @@ def job_publicar_posts() -> None:
             log.info("Posts publicados: %s", r["publicados"])
     except Exception:  # pragma: no cover
         log.exception("Falha ao publicar posts agendados")
+    finally:
+        db.close()
+
+
+def job_recorrencias() -> None:
+    """Cria (e publica) os posts das recorrencias que venceram."""
+    db = SessionLocal()
+    try:
+        r = processar_recorrencias(db)
+        if r["criados"]:
+            log.info("Recorrencias: %s post(s) criado(s), %s publicado(s)", r["criados"], r["publicados"])
+    except Exception:  # pragma: no cover
+        log.exception("Falha ao processar recorrencias")
     finally:
         db.close()

@@ -13,6 +13,7 @@ from app.worker.jobs import (
     job_detectar_aceites,
     job_enviar_abordagens,
     job_publicar_posts,
+    job_recorrencias,
 )
 
 logging.basicConfig(
@@ -56,9 +57,19 @@ def main() -> None:
         coalesce=True,
     )
 
+    # no minuto 5 de cada hora verifica as recorrencias
+    scheduler.add_job(
+        job_recorrencias,
+        "cron",
+        minute=5,
+        id="recorrencias",
+        max_instances=1,
+        coalesce=True,
+    )
+
     log.info(
-        "Worker iniciado. Jobs: enviar_abordagens (2 min), "
-        "detectar_aceites (15 min), publicar_posts (1 min)."
+        "Worker iniciado. Jobs: enviar_abordagens (2 min), detectar_aceites (15 min), "
+        "publicar_posts (1 min), recorrencias (hora)."
     )
     try:
         scheduler.start()

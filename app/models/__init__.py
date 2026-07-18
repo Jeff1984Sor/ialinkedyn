@@ -14,6 +14,7 @@ from app.models.lead import Lead
 from app.models.outreach import OutreachTask
 from app.models.post import Post
 from app.models.prompt import PromptTemplate
+from app.models.recorrencia import PostRecorrencia
 from app.models.user import User
 
 __all__ = [
@@ -31,4 +32,5 @@ __all__ = [
     "Audience",
     "OutreachTask",
     "Post",
+    "PostRecorrencia",
 ]

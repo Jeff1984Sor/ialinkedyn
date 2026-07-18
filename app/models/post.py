@@ -27,6 +27,7 @@ class Post(Base):
     )
     agendado_para: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     publicado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    imagem_path: Mapped[str] = mapped_column(String(500), default="", nullable=False)
     external_id: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     erro: Mapped[str] = mapped_column(Text, default="", nullable=False)
     criado_em: Mapped[datetime] = mapped_column(

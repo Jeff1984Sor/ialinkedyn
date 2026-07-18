@@ -9,12 +9,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.agents import prompt_store
-from app.agents.prompts import montar_criador
+from app.agents.prompts import montar_criador, montar_designer
 from app.core.deps import get_current_user, get_db
 from app.models.post import Post, PostStatus
 from app.models.user import User
 from app.services.brand import get_or_create_brand
 from app.services.ia import gerar
+from app.services.image_gen import gerar_imagem
 from app.services.publisher import publicar_post
 
 router = APIRouter(prefix="/posts", tags=["posts"])
@@ -29,6 +30,7 @@ class PostOut(BaseModel):
     status: str
     agendado_para: datetime | None
     publicado_em: datetime | None
+    imagem_path: str
     external_id: str
     erro: str
     criado_em: datetime
@@ -44,6 +46,7 @@ class PostUpdate(BaseModel):
     texto: str | None = None
     tema: str | None = None
     agendado_para: datetime | None = None
+    imagem_path: str | None = None
     status: str | None = Field(default=None, pattern="^(RASCUNHO|AGENDADO)$")
 
 
@@ -161,3 +164,38 @@ def excluir(
         raise HTTPException(status_code=404, detail="Post não encontrado")
     db.delete(post)
     db.commit()
+
+
+class ImagemResponse(BaseModel):
+    imagem_path: str
+    url: str
+    prompt_usado: str
+
+
+@router.post("/{post_id}/gerar-imagem", response_model=ImagemResponse)
+def gerar_imagem_do_post(
+    post_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> ImagemResponse:
+    """A IA descreve e gera a imagem que ilustra este post."""
+    post = db.get(Post, post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post não encontrado")
+
+    brand = get_or_create_brand(db)
+    template = prompt_store.resolver(db, "designer")
+    # a IA transforma o post em um prompt de imagem
+    prompt_imagem = gerar(db, montar_designer(template, brand, post.tema or post.texto[:600]))
+
+    caminho = gerar_imagem(db, prompt_imagem)
+    post.imagem_path = caminho
+    db.commit()
+
+    from pathlib import Path as _Path
+
+    return ImagemResponse(
+        imagem_path=caminho,
+        url=f"/api/midia/{_Path(caminho).name}",
+        prompt_usado=prompt_imagem,
+    )

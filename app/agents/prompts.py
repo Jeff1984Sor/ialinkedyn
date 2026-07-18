@@ -16,6 +16,7 @@ LABELS: dict[str, str] = {
     "followup": "🤝 Follow-up — 1ª mensagem quando aceitam o convite",
     "perfil": "👤 Perfil — otimizar seu título e o 'Sobre' do LinkedIn",
     "criador": "✍️ Criador — escrever post para o feed",
+    "designer": "🎨 Designer — descrever a imagem do post",
 }
 
 # Marcadores disponíveis em cada prompt (mostrados na UI como ajuda)
@@ -25,6 +26,7 @@ PLACEHOLDERS: dict[str, list[str]] = {
     "followup": ["{{contexto_marca}}", "{{perfil}}"],
     "perfil": ["{{contexto_marca}}", "{{perfil_atual}}"],
     "criador": ["{{contexto_marca}}", "{{tema}}"],
+    "designer": ["{{contexto_marca}}", "{{tema}}"],
 }
 
 DEFAULTS: dict[str, str] = {
@@ -155,6 +157,28 @@ REGRAS:
   bloco único, promessa de prazo fixo ou preço, e inventar dado que não foi informado.
 
 Responda APENAS com o texto do post (sem aspas, sem título, sem explicações).""",
+"designer": """{{contexto_marca}}
+
+TEMA/TEXTO DO POST:
+{{tema}}
+
+TAREFA: Escreva o PROMPT (em INGLES) para um gerador de imagens criar a
+ilustracao deste post no LinkedIn.
+
+O QUE A IMAGEM DEVE SER:
+- Profissional e limpa, adequada a um feed corporativo brasileiro.
+- Conceitual: represente a IDEIA do post (ex.: organizacao, previsibilidade,
+  automacao), nao um print de tela.
+- Composicao simples, boa area de respiro, cores sobrias.
+
+REGRAS OBRIGATORIAS:
+- SEM texto, letras, numeros, logos ou marcas dentro da imagem (geradores
+  escrevem errado e fica amador).
+- Nada de pessoas em close com rostos detalhados.
+- Nada de estilo "banco de imagens" com aperto de maos generico.
+- Descreva assunto, estilo visual, iluminacao, paleta e enquadramento.
+
+Responda APENAS com o prompt em ingles, numa unica linha, sem aspas.""",
 }
 
 
@@ -218,6 +242,13 @@ def montar_perfil(template: str, brand: BrandVoice, perfil_atual: str) -> str:
     return _preencher(
         template,
         {"contexto_marca": contexto_marca(brand), "perfil_atual": perfil_atual},
+    )
+
+
+def montar_designer(template: str, brand: BrandVoice, tema: str) -> str:
+    return _preencher(
+        template,
+        {"contexto_marca": contexto_marca(brand), "tema": tema},
     )
 
 

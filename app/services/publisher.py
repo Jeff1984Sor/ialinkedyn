@@ -18,7 +18,7 @@ def publicar_post(db: Session, post: Post) -> bool:
     """Publica UM post. Marca status e guarda o id externo (ou o erro)."""
     try:
         provider = get_provider(db)
-        externo = provider.publicar_post(post.texto)
+        externo = provider.publicar_post(post.texto, imagem_path=post.imagem_path or "")
         post.external_id = str(externo or "")
         post.status = PostStatus.PUBLICADO
         post.publicado_em = datetime.now(timezone.utc)
