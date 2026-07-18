@@ -22,6 +22,8 @@ from app.schemas.connection import (
     ConfigOut,
     ConfigUpdate,
     ConexaoStatus,
+    ContaDisponivel,
+    ContasDisponiveis,
     TesteIAResult,
 )
 from app.services.config_service import (
@@ -173,6 +175,53 @@ def testar_linkedin(
         return TesteIAResult(ok=False, mensagem=str(e.detail))
 
 
+@router.get("/contas-disponiveis", response_model=ContasDisponiveis)
+def contas_disponiveis(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> ContasDisponiveis:
+    """Lista as contas já conectadas no provedor, para o usuário escolher
+    em vez de digitar o Account ID na mão."""
+    nome_provider = get_provider_name(db)
+
+    if nome_provider == "mock":
+        return ContasDisponiveis(
+            provider="mock",
+            contas=[
+                ContaDisponivel(
+                    id="mock-account-1",
+                    nome="Conta simulada",
+                    tipo="LINKEDIN",
+                    status="OK",
+                )
+            ],
+        )
+
+    try:
+        from app.providers.unipile import UnipileProvider
+
+        dsn, key, account_id = get_unipile(db)
+        cliente = UnipileProvider(dsn=dsn, api_key=key, account_id=account_id)
+        brutas = cliente.listar_contas()
+    except HTTPException as e:
+        return ContasDisponiveis(provider=nome_provider, erro=str(e.detail))
+
+    contas = [
+        ContaDisponivel(
+            id=str(c.get("id", "")),
+            nome=str(c.get("name") or c.get("username") or ""),
+            tipo=str(c.get("type") or ""),
+            status=str(
+                (c.get("sources") or [{}])[0].get("status", "")
+                if isinstance(c.get("sources"), list)
+                else ""
+            ),
+        )
+        for c in brutas
+    ]
+    return ContasDisponiveis(provider=nome_provider, contas=contas)
+
+
 # ---------------------------------------------------------------- status/conta
 
 
@@ -226,12 +275,18 @@ def conectar(
         from app.providers.unipile import UnipileProvider
 
         dsn, key, account_id = get_unipile(db)
+        # se o usuário escolheu uma conta na lista, ela manda (e fica salva)
+        if dados.account_id:
+            account_id = dados.account_id.strip()
+            cfg_atual = get_config(db)
+            cfg_atual.unipile_account_id = account_id
+            db.commit()
         if not account_id:
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    "Preencha o Account ID do Unipile (página Accounts do painel deles) "
-                    "antes de conectar."
+                    "Escolha qual conta do LinkedIn usar (a lista vem do seu painel "
+                    "do Unipile)."
                 ),
             )
         cliente = UnipileProvider(dsn=dsn, api_key=key, account_id=account_id)

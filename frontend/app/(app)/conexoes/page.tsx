@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import {
   Link2, Link2Off, Loader2, Save, ShieldAlert, CheckCircle2, Info,
-  Brain, Plug, FlaskConical, XCircle,
+  Brain, Plug, FlaskConical, XCircle, RefreshCw,
 } from "lucide-react";
 
 type Status = {
@@ -32,6 +32,9 @@ type Config = {
   openai_key_mascarada: string;
   openai_model: string;
 };
+
+type ContaDisponivel = { id: string; nome: string; tipo: string; status: string };
+type ContasResp = { provider: string; contas: ContaDisponivel[]; erro: string };
 
 type Limites = {
   id: number;
@@ -66,6 +69,10 @@ export default function ConexoesPage() {
   const [teste, setTeste] = useState<{ ok: boolean; mensagem: string } | null>(null);
   const [testandoLi, setTestandoLi] = useState(false);
   const [testeLi, setTesteLi] = useState<{ ok: boolean; mensagem: string } | null>(null);
+  const [contas, setContas] = useState<ContaDisponivel[]>([]);
+  const [erroContas, setErroContas] = useState("");
+  const [buscandoContas, setBuscandoContas] = useState(false);
+  const [contaEscolhida, setContaEscolhida] = useState("");
 
   async function carregar() {
     const [s, c, l] = await Promise.all([
@@ -76,7 +83,12 @@ export default function ConexoesPage() {
     setStatus(s); setConfig(c); setLimites(l); setNome(s.nome || "");
   }
 
-  useEffect(() => { carregar().finally(() => setCarregando(false)); }, []);
+  useEffect(() => {
+    carregar()
+      .then(() => carregarContas())
+      .finally(() => setCarregando(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function salvarConfig(silencioso = false): Promise<boolean> {
     if (!config) return false;
@@ -133,10 +145,34 @@ export default function ConexoesPage() {
     }
   }
 
+  async function carregarContas() {
+    setBuscandoContas(true); setErroContas("");
+    try {
+      const r = await api<ContasResp>("/connection/contas-disponiveis");
+      setContas(r.contas);
+      setErroContas(r.erro || "");
+      if (r.contas.length > 0 && !contaEscolhida) {
+        const preferida = config?.unipile_account_id && r.contas.some((c) => c.id === config.unipile_account_id)
+          ? config.unipile_account_id
+          : r.contas[0].id;
+        setContaEscolhida(preferida);
+      }
+    } catch (e) {
+      setErroContas(e instanceof Error ? e.message : "Erro ao buscar contas");
+    } finally {
+      setBuscandoContas(false);
+    }
+  }
+
   async function conectar() {
     setConectando(true);
     try {
-      setStatus(await api<Status>("/connection/conectar", { method: "POST", body: { nome: nome || "Minha conta" } }));
+      const escolhida = contas.find((c) => c.id === contaEscolhida);
+      setStatus(await api<Status>("/connection/conectar", {
+        method: "POST",
+        body: { account_id: contaEscolhida || null, nome: nome || escolhida?.nome || "Minha conta" },
+      }));
+      setConfig(await api<Config>("/connection/config"));
     } catch (e) {
       alert(e instanceof Error ? e.message : "Erro ao conectar");
     } finally {
@@ -289,9 +325,9 @@ export default function ConexoesPage() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-ink mb-1">Account ID (conta do LinkedIn no Unipile)</label>
-              <input className={input} value={config.unipile_account_id} onChange={(e) => setC("unipile_account_id", e.target.value)} placeholder="ex.: 2XEmejM6TiWfNEiiQjtfmg" />
-              <p className="text-xs text-ink-soft mt-1">Copie da pagina <strong>Accounts</strong> no painel do Unipile.</p>
+              <label className="block text-sm font-medium text-ink mb-1">Account ID (opcional)</label>
+              <input className={input} value={config.unipile_account_id} onChange={(e) => setC("unipile_account_id", e.target.value)} placeholder="preenchido automaticamente ao escolher a conta abaixo" />
+              <p className="text-xs text-ink-soft mt-1">Nao precisa digitar: depois de salvar a chave, a lista de contas aparece no card abaixo.</p>
             </div>
           </>
         )}
@@ -341,12 +377,45 @@ export default function ConexoesPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-ink mb-1">Apelido da conta</label>
-              <input className={input} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="ex.: LinkedIn da MayaCorp" />
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-ink">Conta conectada no provedor</label>
+              <button onClick={carregarContas} disabled={buscandoContas} className="flex items-center gap-1 text-xs text-brand hover:underline disabled:opacity-60">
+                {buscandoContas ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} Atualizar lista
+              </button>
             </div>
-            <button onClick={conectar} disabled={conectando || !status.provider_pronto} className="flex items-center gap-2 rounded-lg bg-brand hover:bg-brand-dark text-white px-5 py-2.5 text-sm font-medium disabled:opacity-60">
-              {conectando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />} Conectar LinkedIn
+
+            {erroContas ? (
+              <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">{erroContas}</div>
+            ) : contas.length === 0 ? (
+              <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-sm text-ink-soft">
+                {buscandoContas
+                  ? "Buscando contas..."
+                  : "Nenhuma conta encontrada. Conecte sua conta do LinkedIn no painel do provedor e clique em Atualizar lista."}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {contas.map((c) => (
+                  <label key={c.id} className={`flex items-center gap-3 rounded-lg border p-3 cursor-pointer ${
+                    contaEscolhida === c.id ? "border-brand bg-brand/5" : "border-slate-200 hover:bg-slate-50"
+                  }`}>
+                    <input type="radio" name="conta" className="h-4 w-4 accent-brand" checked={contaEscolhida === c.id} onChange={() => setContaEscolhida(c.id)} />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-ink">{c.nome || "(sem nome)"}</p>
+                      <p className="text-xs text-ink-soft">{c.tipo} - {c.id}</p>
+                    </div>
+                    {c.status && <span className="text-[11px] bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5">{c.status}</span>}
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-ink mb-1">Apelido no painel (opcional)</label>
+              <input className={input} value={nome} onChange={(e) => setNome(e.target.value)} placeholder="deixe vazio para usar o nome da conta" />
+            </div>
+
+            <button onClick={conectar} disabled={conectando || !contaEscolhida} className="flex items-center gap-2 rounded-lg bg-brand hover:bg-brand-dark text-white px-5 py-2.5 text-sm font-medium disabled:opacity-60">
+              {conectando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />} Conectar esta conta
             </button>
           </div>
         )}

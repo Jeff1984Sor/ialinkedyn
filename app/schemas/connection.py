@@ -20,7 +20,10 @@ class ConexaoStatus(BaseModel):
 
 
 class ConectarRequest(BaseModel):
-    nome: str = Field(min_length=1, max_length=180, description="Apelido da conta no painel")
+    # Conta escolhida na lista do provedor. Se vier, é salva na config.
+    account_id: str | None = Field(default=None, description="ID da conta no provedor")
+    # Apelido opcional; se vazio, usa o nome que veio do provedor.
+    nome: str = Field(default="", max_length=180, description="Apelido da conta no painel")
 
 
 class AutomationOut(BaseModel):
@@ -80,3 +83,18 @@ class ConfigUpdate(BaseModel):
 class TesteIAResult(BaseModel):
     ok: bool
     mensagem: str
+
+
+class ContaDisponivel(BaseModel):
+    """Conta já conectada no provedor (ex.: no painel do Unipile)."""
+
+    id: str
+    nome: str = ""
+    tipo: str = ""
+    status: str = ""
+
+
+class ContasDisponiveis(BaseModel):
+    provider: str
+    contas: list[ContaDisponivel] = []
+    erro: str = ""
