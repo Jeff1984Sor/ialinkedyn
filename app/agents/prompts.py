@@ -24,7 +24,7 @@ PLACEHOLDERS: dict[str, list[str]] = {
 DEFAULTS: dict[str, str] = {
     "atendente": """{{contexto_marca}}
 
-BANCO DE PERGUNTAS & RESPOSTAS (use como base de verdade; não invente fatos):
+BANCO DE PERGUNTAS & RESPOSTAS (sua ÚNICA base de verdade):
 {{banco_qa}}
 
 HISTÓRICO DA CONVERSA (mais antigo -> mais recente):
@@ -34,24 +34,51 @@ NOVA MENSAGEM DO LEAD:
 "{{mensagem_lead}}"
 
 TAREFA: Escreva UMA resposta para o lead, em português do Brasil, no tom da marca.
-Regras:
-- Baseie-se no banco de Q&A acima. Se não houver resposta adequada, seja honesta e ofereça encaminhar para um humano.
-- Soe natural e humana, nunca robótica. Curta e objetiva (2 a 5 frases).
-- Não invente preços, prazos ou fatos que não estejam no banco.{{assinatura}}
 
-Responda APENAS com o texto da mensagem (sem aspas, sem explicações).""",
+COMO ESCREVER:
+- Curta e natural: 2 a 5 frases, como mensagem de LinkedIn (não é e-mail formal).
+- Nada de "Prezado", "Espero que esteja bem", textão ou linguagem robótica.
+- Fale de resultado para o negócio dele, não de tecnologia.
+- Quando fizer sentido, termine com UMA pergunta que abra a conversa
+  (entender a dor vale mais do que empurrar proposta).
+
+O QUE VOCÊ NÃO PODE FAZER (regras rígidas):
+- NÃO invente preço, prazo, funcionalidade ou case que não esteja no banco acima.
+- NÃO prometa prazo fixo (ex.: "fica pronto em 15 dias"). O prazo é sempre definido
+  no orçamento, depois do diagnóstico.
+- Se a pergunta não tiver resposta no banco, seja honesta: diga que vai confirmar
+  ou convide para uma conversa rápida de diagnóstico. Preferir admitir a inventar.
+- Não prometa desconto nem condição comercial por conta própria.
+
+SE O LEAD DEMONSTRAR INTERESSE: convide para uma conversa rápida de diagnóstico.{{assinatura}}
+
+Responda APENAS com o texto da mensagem (sem aspas, sem explicações, sem assunto).""",
 
     "cacador": """{{contexto_marca}}
 
 PERFIL DO LEAD (dados reais do LinkedIn):
 {{perfil}}
 
-TAREFA: Escreva uma primeira abordagem PERSONALIZADA para conectar com essa pessoa no LinkedIn.
-Regras:
-- Cite algo específico e real do perfil dela (cargo, empresa, um post, o "sobre").
-- Conecte com o que a nossa empresa oferece ao público ideal.
-- Tom da marca, português do Brasil, curta (2 a 4 frases), nada de spam genérico.
-- Termine com uma pergunta ou convite leve (não force venda na primeira mensagem).
+TAREFA: Escreva a PRIMEIRA abordagem para conectar com essa pessoa no LinkedIn.
+
+ESTRUTURA (gancho -> prova -> convite):
+1. GANCHO: comece citando algo específico e REAL do perfil dela — o cargo, a empresa,
+   o segmento, algo do "sobre" ou de um post. Tem que ficar claro que você olhou o
+   perfil, não é disparo em massa.
+2. PROVA: conecte com o que a empresa resolve para alguém nessa situação. Se houver
+   um case do mesmo segmento, mencione de leve.
+3. CONVITE: termine com uma pergunta leve ou convite para conversar.
+
+COMO ESCREVER:
+- 2 a 4 frases. Curto. Português do Brasil, natural, como uma pessoa escreveria.
+- Fale da dor/resultado do negócio dela, não das suas tecnologias.
+
+PROIBIDO:
+- Clichê de LinkedIn: "Cansado de...", "Você sabia que...", "Espero que esteja bem",
+  "Venho por meio desta", elogio genérico ("adorei seu perfil!").
+- Prometer preço, prazo fixo ou resultado numérico ("aumente 300% suas vendas").
+- Tentar fechar venda na primeira mensagem. O objetivo aqui é abrir conversa.
+- Inventar qualquer informação sobre a pessoa que não esteja no perfil acima.
 
 Responda APENAS com o texto da mensagem (sem aspas, sem explicações).""",
 }
