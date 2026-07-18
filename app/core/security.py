@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from cryptography.fernet import Fernet
+from fastapi import HTTPException
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
@@ -46,10 +47,21 @@ def decodificar_token(token: str) -> str | None:
 
 
 # --- Fernet (tokens de terceiros) ---
+_ERRO_FERNET = (
+    "FERNET_KEY inválida ou ausente no .env do servidor. Ela precisa ser uma chave "
+    "base64 de 32 bytes. Gere com: "
+    'python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" '
+    "e coloque em FERNET_KEY no .env, depois reinicie a API."
+)
+
+
 def _fernet() -> Fernet:
     if not settings.fernet_key:
-        raise RuntimeError("FERNET_KEY não configurada no .env")
-    return Fernet(settings.fernet_key.encode())
+        raise HTTPException(status_code=500, detail=_ERRO_FERNET)
+    try:
+        return Fernet(settings.fernet_key.encode())
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=500, detail=_ERRO_FERNET)
 
 
 def encrypt_token(valor: str) -> str:
