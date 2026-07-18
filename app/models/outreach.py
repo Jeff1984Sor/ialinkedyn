@@ -19,6 +19,8 @@ class OutreachStatus:
 class OutreachTipo:
     CONVITE = "CONVITE"      # convite de conexão com nota (para quem não é conexão)
     MENSAGEM = "MENSAGEM"    # mensagem direta no chat (para quem já é conexão)
+    INMAIL = "INMAIL"        # mensagem para não-conexão usando crédito de InMail
+    FOLLOWUP = "FOLLOWUP"    # 1ª mensagem automática após o convite ser aceito
 
 
 class OutreachTask(Base):

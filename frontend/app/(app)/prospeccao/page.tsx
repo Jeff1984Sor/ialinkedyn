@@ -13,6 +13,7 @@ type Perfil = {
   empresa: string;
   cargo: string;
   linkedin_url: string;
+  provider_id: string;
   sobre: string;
   posts_recentes: string[];
   ja_importado: boolean;
@@ -45,7 +46,7 @@ export default function ProspeccaoPage() {
   const [buscando, setBuscando] = useState(false);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
 
-  const [tipo, setTipo] = useState<"CONVITE" | "MENSAGEM">("CONVITE");
+  const [tipo, setTipo] = useState<"CONVITE" | "MENSAGEM" | "INMAIL">("CONVITE");
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<CampanhaResp | null>(null);
 
@@ -234,10 +235,15 @@ export default function ProspeccaoPage() {
             <h3 className="font-semibold text-ink flex items-center gap-2"><Send className="h-4 w-4 text-brand" /> 3. Enviar abordagem</h3>
             <div>
               <label className="block text-sm font-medium text-ink mb-1">Como enviar</label>
-              <select className={input} value={tipo} onChange={(e) => setTipo(e.target.value as "CONVITE" | "MENSAGEM")}>
-                <option value="CONVITE">Convite de conexão com nota (recomendado — até 300 caracteres)</option>
-                <option value="MENSAGEM">Mensagem direta no chat (só funciona com quem já é conexão)</option>
+              <select className={input} value={tipo} onChange={(e) => setTipo(e.target.value as "CONVITE" | "MENSAGEM" | "INMAIL")}>
+                <option value="CONVITE">Convite de conexão com nota (recomendado — aparece em Minha rede)</option>
+                <option value="MENSAGEM">Mensagem no chat (só para quem JÁ é sua conexão)</option>
+                <option value="INMAIL">InMail (chat com não-conexões — consome crédito Premium/Sales Navigator)</option>
               </select>
+              <p className="text-xs text-ink-soft mt-1">
+                Convite não aparece na caixa de mensagens do LinkedIn — ele fica em <strong>Minha rede</strong>.
+                Quando a pessoa aceitar, a Maya manda a 1ª mensagem no chat automaticamente.
+              </p>
             </div>
 
             <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 flex gap-2">

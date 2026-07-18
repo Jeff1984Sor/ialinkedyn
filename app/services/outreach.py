@@ -127,14 +127,15 @@ def enviar_tarefa(db: Session, tarefa: OutreachTask) -> bool:
         # o id interno pode já estar salvo no lead (vindo da busca)
         pid = (lead.provider_id or "").strip()
 
-        if tarefa.tipo == OutreachTipo.MENSAGEM:
+        if tarefa.tipo in (OutreachTipo.MENSAGEM, OutreachTipo.FOLLOWUP, OutreachTipo.INMAIL):
             if not pid:
                 pid = provider.obter_perfil(lead.linkedin_url).provider_id
                 lead.provider_id = pid
             enviar = getattr(provider, "iniciar_conversa", None)
             if enviar is None:
                 raise HTTPException(status_code=501, detail="Provedor não suporta iniciar conversa")
-            enviar(pid, tarefa.mensagem)
+            # InMail é o único jeito de falar no chat com quem NÃO é conexão
+            enviar(pid, tarefa.mensagem, inmail=(tarefa.tipo == OutreachTipo.INMAIL))
         else:
             # convite com nota (padrão para quem ainda não é conexão)
             provider.enviar_convite(lead.linkedin_url, tarefa.mensagem, provider_id=pid)
@@ -145,12 +146,13 @@ def enviar_tarefa(db: Session, tarefa: OutreachTask) -> bool:
 
         # reflete no CRM
         _registrar_conversa(db, lead, tarefa.mensagem)
-        if lead.status in (LeadStatus.NOVO.value, LeadStatus.SEGUINDO.value):
-            lead.status = (
-                LeadStatus.CONVIDADO.value
-                if tarefa.tipo == OutreachTipo.CONVITE
-                else LeadStatus.ABORDADO.value
-            )
+        if tarefa.tipo == OutreachTipo.CONVITE:
+            if lead.status in (LeadStatus.NOVO.value, LeadStatus.SEGUINDO.value):
+                lead.status = LeadStatus.CONVIDADO.value
+        else:
+            # mensagem/follow-up/inmail = já falamos com a pessoa
+            if lead.status != LeadStatus.RESPONDEU.value:
+                lead.status = LeadStatus.ABORDADO.value
         db.commit()
         return True
 

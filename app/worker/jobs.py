@@ -5,6 +5,7 @@ import logging
 import random
 
 from app.core.database import SessionLocal
+from app.services.growth import detectar_aceites
 from app.services.outreach import processar_fila
 
 log = logging.getLogger("ialinkedyn.worker")
@@ -27,5 +28,22 @@ def job_enviar_abordagens() -> None:
             log.info("Nada enviado: %s", resultado["motivo"])
     except Exception:  # pragma: no cover
         log.exception("Falha ao processar a fila de abordagens")
+    finally:
+        db.close()
+
+
+def job_detectar_aceites() -> None:
+    """Vê quem aceitou o convite e já enfileira a 1ª mensagem no chat."""
+    db = SessionLocal()
+    try:
+        r = detectar_aceites(db)
+        if r["aceites"]:
+            log.info(
+                "Aceites detectados: %s | follow-ups enfileirados: %s",
+                r["aceites"],
+                r["followups"],
+            )
+    except Exception:  # pragma: no cover
+        log.exception("Falha ao detectar aceites")
     finally:
         db.close()

@@ -13,12 +13,14 @@ from app.models.knowledge import KnowledgeItem
 LABELS: dict[str, str] = {
     "atendente": "💬 Atendente — responder mensagens do chat",
     "cacador": "🎯 Caçador — 1ª abordagem personalizada",
+    "followup": "🤝 Follow-up — 1ª mensagem quando aceitam o convite",
 }
 
 # Marcadores disponíveis em cada prompt (mostrados na UI como ajuda)
 PLACEHOLDERS: dict[str, list[str]] = {
     "atendente": ["{{contexto_marca}}", "{{banco_qa}}", "{{historico}}", "{{mensagem_lead}}", "{{assinatura}}"],
     "cacador": ["{{contexto_marca}}", "{{perfil}}"],
+    "followup": ["{{contexto_marca}}", "{{perfil}}"],
 }
 
 DEFAULTS: dict[str, str] = {
@@ -79,6 +81,27 @@ PROIBIDO:
 - Prometer preço, prazo fixo ou resultado numérico ("aumente 300% suas vendas").
 - Tentar fechar venda na primeira mensagem. O objetivo aqui é abrir conversa.
 - Inventar qualquer informação sobre a pessoa que não esteja no perfil acima.
+
+Responda APENAS com o texto da mensagem (sem aspas, sem explicações).""",
+
+    "followup": """{{contexto_marca}}
+
+PERFIL DA PESSOA (acabou de ACEITAR seu convite de conexão):
+{{perfil}}
+
+TAREFA: Escreva a primeira mensagem no chat, agora que vocês estão conectados.
+
+COMO ESCREVER:
+- Comece agradecendo a conexão de forma leve e natural (uma linha, sem bajulação).
+- Faça a ponte com algo real do perfil dela (cargo, empresa, segmento).
+- Termine com UMA pergunta aberta sobre a operação/rotina dela — o objetivo aqui
+  é começar uma conversa, não vender.
+- 2 a 4 frases. Português do Brasil, tom de mensagem de LinkedIn.
+
+PROIBIDO:
+- Emendar proposta comercial ou preço nesta primeira mensagem.
+- Clichê ("Espero que esteja bem", "Adorei seu perfil", "Cansado de...").
+- Texto longo ou com cara de modelo pronto.
 
 Responda APENAS com o texto da mensagem (sem aspas, sem explicações).""",
 }

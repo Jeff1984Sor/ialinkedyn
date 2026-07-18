@@ -17,6 +17,7 @@ Endpoints usados:
 """
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import httpx
@@ -230,15 +231,65 @@ class UnipileProvider(LinkedInProvider):
         )
         return True
 
-    def iniciar_conversa(self, provider_id: str, texto: str) -> str:
-        """Inicia uma conversa nova. Devolve o chat_id."""
+    def iniciar_conversa(self, provider_id: str, texto: str, inmail: bool = False) -> str:
+        """Inicia uma conversa nova. Devolve o chat_id.
+
+        inmail=True usa um crédito de InMail — é o único jeito de mandar
+        mensagem no chat para quem NÃO é sua conexão.
+        """
         conta = self._exige_conta()
-        dados = self._req(
-            "POST",
-            "/chats",
-            data={"account_id": conta, "attendees_ids": provider_id, "text": texto},
-        )
+        corpo: dict[str, Any] = {
+            "account_id": conta,
+            "attendees_ids": provider_id,
+            "text": texto,
+        }
+        if inmail:
+            # opções específicas do LinkedIn vão como JSON dentro do multipart
+            corpo["linkedin"] = json.dumps({"api": "classic", "inmail": True})
+        dados = self._req("POST", "/chats", data=corpo)
         return str(dados.get("chat_id", "")) if isinstance(dados, dict) else ""
+
+    # ------------------------------------------------------- rede / convites
+
+    def listar_relacoes(self, limite: int = 100, cursor: str = "") -> tuple[list[PerfilLinkedIn], str]:
+        """Lista suas conexões. Devolve (perfis, proximo_cursor)."""
+        conta = self._exige_conta()
+        params: dict[str, Any] = {"account_id": conta, "limit": min(max(limite, 1), 1000)}
+        if cursor:
+            params["cursor"] = cursor
+        dados = self._req("GET", "/users/relations", params=params)
+        itens = dados.get("items", []) if isinstance(dados, dict) else []
+        proximo = str(dados.get("cursor") or "") if isinstance(dados, dict) else ""
+
+        perfis: list[PerfilLinkedIn] = []
+        for r in itens:
+            nome = " ".join(
+                p for p in [r.get("first_name"), r.get("last_name")] if p
+            ).strip()
+            publico = str(r.get("public_identifier") or "")
+            perfis.append(
+                PerfilLinkedIn(
+                    nome=nome or publico,
+                    headline=str(r.get("headline") or ""),
+                    linkedin_url=str(
+                        r.get("public_profile_url")
+                        or (f"https://www.linkedin.com/in/{publico}" if publico else "")
+                    ),
+                    provider_id=str(r.get("member_id") or r.get("member_urn") or ""),
+                )
+            )
+        return perfis, proximo
+
+    def listar_convites_enviados(self) -> list[dict[str, Any]]:
+        """Convites que ainda estão PENDENTES (quem aceitou some desta lista)."""
+        conta = self._exige_conta()
+        dados = self._req("GET", "/users/invite/sent", params={"account_id": conta})
+        return dados.get("items", []) if isinstance(dados, dict) else []
+
+    def saldo_inmail(self) -> dict[str, Any]:
+        conta = self._exige_conta()
+        dados = self._req("GET", "/linkedin/inmail_balance", params={"account_id": conta})
+        return dados if isinstance(dados, dict) else {}
 
     # ------------------------------------------------------------------ post
 

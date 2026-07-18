@@ -17,6 +17,7 @@ from app.routers import (
     knowledge,
     leads,
     prompts,
+    rede,
 )
 
 app = FastAPI(
@@ -56,3 +57,4 @@ app.include_router(connection.router)
 app.include_router(prompts.router)
 app.include_router(audiences.router)
 app.include_router(campanha.router)
+app.include_router(rede.router)

@@ -42,7 +42,7 @@ class CampanhaRequest(BaseModel):
     perfis: list[PerfilEncontrado]
     audience_id: int | None = None
     # CONVITE (padrão, para quem não é conexão) ou MENSAGEM (chat direto)
-    tipo: str = Field(default="CONVITE", pattern="^(CONVITE|MENSAGEM)$")
+    tipo: str = Field(default="CONVITE", pattern="^(CONVITE|MENSAGEM|INMAIL)$")
 
 
 class CampanhaResponse(BaseModel):
