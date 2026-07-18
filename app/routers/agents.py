@@ -27,6 +27,7 @@ from app.schemas.agent import (
 )
 from app.services.brand import get_or_create_brand
 from app.services.config_service import get_provider_name
+from app.services.dedup import achar_lead, normalizar_url, url_canonica
 from app.services.ia import gerar
 from app.services.knowledge_search import buscar_relevantes
 
@@ -138,9 +139,13 @@ def buscar(
     provider = get_provider(db)
     encontrados = provider.buscar_pessoas(termo, limite=dados.limite)
 
-    # marca quem já existe no CRM (evita importar duplicado)
-    urls_existentes = {
-        u for (u,) in db.execute(select(Lead.linkedin_url).where(Lead.linkedin_url != "")).all()
+    # marca quem já existe no CRM (compara normalizado + provider_id)
+    slugs_existentes = {
+        normalizar_url(u)
+        for (u,) in db.execute(select(Lead.linkedin_url).where(Lead.linkedin_url != "")).all()
+    }
+    pids_existentes = {
+        pid for (pid,) in db.execute(select(Lead.provider_id).where(Lead.provider_id != "")).all()
     }
 
     perfis = [
@@ -153,7 +158,10 @@ def buscar(
             provider_id=p.provider_id,
             sobre=p.sobre,
             posts_recentes=list(p.posts_recentes),
-            ja_importado=bool(p.linkedin_url and p.linkedin_url in urls_existentes),
+            ja_importado=bool(
+                (p.provider_id and p.provider_id in pids_existentes)
+                or (p.linkedin_url and normalizar_url(p.linkedin_url) in slugs_existentes)
+            ),
         )
         for p in encontrados
     ]
@@ -174,14 +182,10 @@ def importar_leads(
     _: User = Depends(get_current_user),
 ) -> ImportarResponse:
     """Importa os perfis encontrados como Leads no CRM (sem duplicar)."""
-    urls_existentes = {
-        u for (u,) in db.execute(select(Lead.linkedin_url).where(Lead.linkedin_url != "")).all()
-    }
-
     novos: list[Lead] = []
     ignorados = 0
     for p in dados.perfis:
-        if p.linkedin_url and p.linkedin_url in urls_existentes:
+        if achar_lead(db, p.provider_id, p.linkedin_url) is not None:
             ignorados += 1
             continue
         lead = Lead(
@@ -189,16 +193,15 @@ def importar_leads(
             headline=p.headline,
             empresa=p.empresa,
             cargo=p.cargo,
-            linkedin_url=p.linkedin_url,
+            linkedin_url=url_canonica(p.linkedin_url) or p.linkedin_url,
             provider_id=p.provider_id,
             origem="Busca LinkedIn",
             status="NOVO",
             notas=p.sobre,
         )
         db.add(lead)
+        db.flush()  # para o próximo achar_lead já enxergar este
         novos.append(lead)
-        if p.linkedin_url:
-            urls_existentes.add(p.linkedin_url)
 
     db.commit()
     for lead in novos:

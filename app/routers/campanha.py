@@ -17,6 +17,7 @@ from app.models.user import User
 from app.providers.unipile import LIMITE_NOTA_CONVITE
 from app.schemas.audience import CampanhaRequest, CampanhaResponse, FilaStatus, TarefaOut
 from app.services.brand import get_or_create_brand
+from app.services.dedup import achar_lead, url_canonica
 from app.services.ia import gerar
 from app.services.outreach import (
     dentro_do_horario,
@@ -55,17 +56,15 @@ def enfileirar_campanha(
     ja_abordados = 0
 
     for p in dados.perfis:
-        # 1) lead (sem duplicar)
-        lead = None
-        if p.linkedin_url:
-            lead = db.scalar(select(Lead).where(Lead.linkedin_url == p.linkedin_url))
+        # 1) lead (sem duplicar: casa por provider_id ou URL normalizada)
+        lead = achar_lead(db, p.provider_id, p.linkedin_url)
         if lead is None:
             lead = Lead(
                 nome=p.nome or "(sem nome)",
                 headline=p.headline,
                 empresa=p.empresa,
                 cargo=p.cargo,
-                linkedin_url=p.linkedin_url,
+                linkedin_url=url_canonica(p.linkedin_url) or p.linkedin_url,
                 provider_id=p.provider_id,
                 origem="Campanha LinkedIn",
                 status="NOVO",
@@ -75,6 +74,9 @@ def enfileirar_campanha(
             db.commit()
             db.refresh(lead)
             leads_criados += 1
+        elif p.provider_id and not lead.provider_id:
+            lead.provider_id = p.provider_id
+            db.commit()
 
         # 2) não abordar de novo quem já tem tarefa pendente/enviada
         existente = db.scalar(
