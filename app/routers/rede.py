@@ -35,12 +35,11 @@ class SaldoInMail(BaseModel):
 
 @router.get("/conexoes", response_model=ConexoesResponse)
 def conexoes(
-    limite: int = 100,
-    cursor: str = "",
+    limite: int = 500,
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> ConexoesResponse:
-    """Lista suas conexões do LinkedIn (para mandar mensagem no chat)."""
+    """Lista suas conexões do LinkedIn, paginando até o total pedido."""
     provider = get_provider(db)
     listar = getattr(provider, "listar_relacoes", None)
     if listar is None:
@@ -48,7 +47,24 @@ def conexoes(
             status_code=501,
             detail="O provedor atual não lista conexões. Configure o Unipile em Conexões.",
         )
-    perfis, proximo = listar(limite=limite, cursor=cursor)
+
+    perfis = []
+    vistos: set[str] = set()
+    cursor = ""
+    for _pagina in range(max(1, limite // 100 + 2)):
+        if len(perfis) >= limite:
+            break
+        lote, cursor = listar(limite=min(100, limite - len(perfis)), cursor=cursor)
+        for p in lote:
+            chave = p.provider_id or p.linkedin_url
+            if chave and chave in vistos:
+                continue
+            if chave:
+                vistos.add(chave)
+            perfis.append(p)
+        if not cursor:
+            break
+    proximo = cursor
     return ConexoesResponse(
         total=len(perfis),
         proximo_cursor=proximo,

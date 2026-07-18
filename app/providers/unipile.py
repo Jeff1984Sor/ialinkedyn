@@ -136,16 +136,65 @@ class UnipileProvider(LinkedInProvider):
 
     # ------------------------------------------------------------------ busca
 
+    # a busca "classic" devolve no máximo 50 por página
+    PAGINA_BUSCA = 50
+
     def buscar_pessoas(self, termo: str, limite: int = 10) -> list[PerfilLinkedIn]:
+        """Busca pessoas paginando até juntar `limite` resultados.
+
+        Sem paginação a API devolve sempre a mesma primeira página.
+        """
         conta = self._exige_conta()
-        dados = self._req(
-            "POST",
-            "/linkedin/search",
-            params={"account_id": conta, "limit": min(max(limite, 1), 50)},
-            json={"api": "classic", "category": "people", "keywords": termo},
-        )
-        itens = dados.get("items", []) if isinstance(dados, dict) else []
-        return [_para_perfil(i) for i in itens]
+        alvo = max(1, limite)
+
+        perfis: list[PerfilLinkedIn] = []
+        vistos: set[str] = set()
+        cursor = ""
+
+        # trava de segurança para não entrar em laço infinito
+        max_paginas = max(1, (alvo // self.PAGINA_BUSCA) + 2)
+
+        for _ in range(max_paginas):
+            faltam = alvo - len(perfis)
+            if faltam <= 0:
+                break
+
+            params: dict[str, Any] = {
+                "account_id": conta,
+                "limit": min(faltam, self.PAGINA_BUSCA),
+            }
+            if cursor:
+                params["cursor"] = cursor
+
+            dados = self._req(
+                "POST",
+                "/linkedin/search",
+                params=params,
+                json={"api": "classic", "category": "people", "keywords": termo},
+            )
+            if not isinstance(dados, dict):
+                break
+
+            itens = dados.get("items", []) or []
+            if not itens:
+                break
+
+            for i in itens:
+                p = _para_perfil(i)
+                chave = p.provider_id or p.linkedin_url
+                if chave and chave in vistos:
+                    continue
+                if chave:
+                    vistos.add(chave)
+                perfis.append(p)
+                if len(perfis) >= alvo:
+                    break
+
+            cursor = str(dados.get("cursor") or dados.get("paging", {}).get("cursor") or "")
+            if not cursor:
+                break  # acabaram os resultados
+
+        return perfis
 
     def buscar_empresas(self, termo: str, limite: int = 10) -> list[dict[str, Any]]:
         conta = self._exige_conta()

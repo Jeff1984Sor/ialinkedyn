@@ -41,6 +41,7 @@ export default function ProspeccaoPage() {
   const [publicos, setPublicos] = useState<Publico[]>([]);
   const [publicoId, setPublicoId] = useState<number | "">("");
   const [termoLivre, setTermoLivre] = useState("");
+  const [quantidade, setQuantidade] = useState(50);
 
   const [busca, setBusca] = useState<BuscaResp | null>(null);
   const [buscando, setBuscando] = useState(false);
@@ -70,7 +71,7 @@ export default function ProspeccaoPage() {
     try {
       const escolhido = publicos.find((p) => p.id === publicoId);
       const termo = termoLivre.trim() || escolhido?.termo || null;
-      const r = await api<BuscaResp>("/agents/buscar", { method: "POST", body: { termo, limite: 20 } });
+      const r = await api<BuscaResp>("/agents/buscar", { method: "POST", body: { termo, limite: quantidade } });
       setBusca(r);
     } catch (e) {
       alert(e instanceof Error ? e.message : "Erro na busca");
@@ -180,11 +181,20 @@ export default function ProspeccaoPage() {
               onChange={(e) => { setTermoLivre(e.target.value); if (e.target.value) setPublicoId(""); }}
               onKeyDown={(e) => e.key === "Enter" && buscar()}
               placeholder="ex.: diretores comerciais de SaaS em São Paulo" />
+            <select value={quantidade} onChange={(e) => setQuantidade(Number(e.target.value))}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand">
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={250}>250</option>
+              <option value={500}>500</option>
+              <option value={1000}>1000</option>
+            </select>
             <button onClick={buscar} disabled={buscando} className="flex items-center gap-2 rounded-lg bg-brand hover:bg-brand-dark text-white px-5 py-2 text-sm font-medium disabled:opacity-60 whitespace-nowrap">
               {buscando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Buscar
             </button>
           </div>
-          <p className="text-xs text-ink-soft mt-1">Vazio + nenhum público = usa o ICP da sua Marca / Voz.</p>
+          <p className="text-xs text-ink-soft mt-1">Vazio + nenhum público = usa o ICP da sua Marca / Voz. Buscas grandes (500+) demoram mais, pois o LinkedIn devolve 50 por vez.</p>
         </div>
       </div>
 

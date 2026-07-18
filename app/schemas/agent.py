@@ -34,7 +34,7 @@ class ProspectarResponse(BaseModel):
 class BuscarRequest(BaseModel):
     # Se vazio, usa o ICP cadastrado em Marca/Voz
     termo: str | None = None
-    limite: int = Field(default=10, ge=1, le=50)
+    limite: int = Field(default=50, ge=1, le=1000)
 
 
 class PerfilEncontrado(BaseModel):
