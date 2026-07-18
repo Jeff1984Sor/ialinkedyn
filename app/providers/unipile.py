@@ -26,6 +26,10 @@ from app.providers.base import ConversaExterna, LinkedInProvider, PerfilLinkedIn
 
 TIMEOUT = 30.0
 
+# O LinkedIn recusa nota de convite acima disso (contas free têm limite menor
+# que o Premium; 200 é o valor seguro para todos).
+LIMITE_NOTA_CONVITE = 200
+
 
 class UnipileProvider(LinkedInProvider):
     nome = "unipile"
@@ -116,6 +120,14 @@ class UnipileProvider(LinkedInProvider):
     def obter_perfil(self, linkedin_url: str) -> PerfilLinkedIn:
         conta = self._exige_conta()
         identificador = _identificador_de_url(linkedin_url)
+        if not identificador:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Este lead não tem URL do LinkedIn — não dá para identificar a "
+                    "pessoa no provedor. Importe-o pela busca ou preencha a URL."
+                ),
+            )
         dados = self._req(
             "GET", f"/users/{identificador}", params={"account_id": conta}
         )
@@ -146,13 +158,29 @@ class UnipileProvider(LinkedInProvider):
 
     # ------------------------------------------------------------------ ações
 
-    def enviar_convite(self, linkedin_url: str, mensagem: str) -> bool:
+    def enviar_convite(
+        self, linkedin_url: str, mensagem: str, provider_id: str = ""
+    ) -> bool:
         conta = self._exige_conta()
-        perfil = self.obter_perfil(linkedin_url)
-        provider_id = perfil.provider_id or _identificador_de_url(linkedin_url)
-        corpo: dict[str, Any] = {"provider_id": provider_id, "account_id": conta}
+
+        # a API exige o id INTERNO da pessoa; o public identifier (ana-souza)
+        # é recusado com "User ID does not match provider's expected format".
+        pid = (provider_id or "").strip()
+        if not pid:
+            perfil = self.obter_perfil(linkedin_url)
+            pid = perfil.provider_id
+        if not pid:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Não consegui obter o ID interno dessa pessoa no LinkedIn. "
+                    "Refaça a busca para importar o lead com o ID correto."
+                ),
+            )
+
+        corpo: dict[str, Any] = {"provider_id": pid, "account_id": conta}
         if mensagem:
-            corpo["message"] = mensagem[:300]
+            corpo["message"] = mensagem[:LIMITE_NOTA_CONVITE]
         self._req("POST", "/users/invite", json=corpo)
         return True
 
@@ -256,8 +284,24 @@ def _para_perfil(d: dict[str, Any]) -> PerfilLinkedIn:
     if not cargo:
         cargo = str(d.get("current_position") or "")
 
-    publico = str(d.get("public_identifier") or "")
-    url = d.get("profile_url") or (f"https://www.linkedin.com/in/{publico}" if publico else "")
+    publico = str(d.get("public_identifier") or d.get("public_profile_url") or "")
+    if "/in/" in publico:
+        publico = publico.rstrip("/").split("/in/", 1)[1].split("/")[0]
+
+    url = (
+        d.get("profile_url")
+        or d.get("public_profile_url")
+        or (f"https://www.linkedin.com/in/{publico}" if publico else "")
+    )
+
+    # O id interno vem com nomes diferentes entre perfil e resultado de busca.
+    provider_id = str(
+        d.get("provider_id")
+        or d.get("member_urn")
+        or d.get("entity_urn")
+        or d.get("id")
+        or ""
+    )
 
     return PerfilLinkedIn(
         nome=nome,
@@ -267,5 +311,5 @@ def _para_perfil(d: dict[str, Any]) -> PerfilLinkedIn:
         linkedin_url=str(url),
         sobre=str(d.get("summary") or d.get("about") or ""),
         posts_recentes=[],
-        provider_id=str(d.get("provider_id") or d.get("id") or ""),
+        provider_id=provider_id,
     )

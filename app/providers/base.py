@@ -48,7 +48,9 @@ class LinkedInProvider(ABC):
         ...
 
     @abstractmethod
-    def enviar_convite(self, linkedin_url: str, mensagem: str) -> bool:
+    def enviar_convite(
+        self, linkedin_url: str, mensagem: str, provider_id: str = ""
+    ) -> bool:
         ...
 
     @abstractmethod

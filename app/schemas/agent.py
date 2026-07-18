@@ -43,6 +43,7 @@ class PerfilEncontrado(BaseModel):
     empresa: str = ""
     cargo: str = ""
     linkedin_url: str = ""
+    provider_id: str = ""
     sobre: str = ""
     posts_recentes: list[str] = []
     ja_importado: bool = False

@@ -14,6 +14,7 @@ from app.models.audience import Audience
 from app.models.lead import Lead
 from app.models.outreach import OutreachStatus, OutreachTask
 from app.models.user import User
+from app.providers.unipile import LIMITE_NOTA_CONVITE
 from app.schemas.audience import CampanhaRequest, CampanhaResponse, FilaStatus, TarefaOut
 from app.services.brand import get_or_create_brand
 from app.services.ia import gerar
@@ -65,6 +66,7 @@ def enfileirar_campanha(
                 empresa=p.empresa,
                 cargo=p.cargo,
                 linkedin_url=p.linkedin_url,
+                provider_id=p.provider_id,
                 origem="Campanha LinkedIn",
                 status="NOVO",
                 notas=p.sobre,
@@ -100,11 +102,19 @@ def enfileirar_campanha(
                 ],
             )
         )
-        mensagem = gerar(db, montar_cacador(template, brand, perfil_texto))
+        prompt = montar_cacador(template, brand, perfil_texto)
+        if dados.tipo == "CONVITE":
+            # nota de convite do LinkedIn é curta: peça isso à IA explicitamente
+            prompt += (
+                f"\n\nRESTRIÇÃO CRÍTICA: esta mensagem é a nota de um CONVITE de conexão "
+                f"do LinkedIn, que aceita no máximo {LIMITE_NOTA_CONVITE} caracteres. "
+                f"Escreva bem curto — 1 a 2 frases. Não ultrapasse esse limite."
+            )
+        mensagem = gerar(db, prompt)
 
-        # convite do LinkedIn tem limite de 300 caracteres
-        if dados.tipo == "CONVITE" and len(mensagem) > 300:
-            mensagem = mensagem[:297].rstrip() + "..."
+        # rede de segurança: corta se a IA passar do limite
+        if dados.tipo == "CONVITE" and len(mensagem) > LIMITE_NOTA_CONVITE:
+            mensagem = mensagem[: LIMITE_NOTA_CONVITE - 3].rstrip() + "..."
 
         enfileirar(db, lead.id, mensagem, tipo=dados.tipo, audience_id=dados.audience_id)
         enfileirados += 1
@@ -186,6 +196,22 @@ def cancelar(
         raise HTTPException(status_code=400, detail="Essa abordagem já foi enviada.")
     tarefa.status = OutreachStatus.CANCELADO
     db.commit()
+
+
+@router.post("/reprocessar-erros", response_model=dict)
+def reprocessar_erros(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> dict:
+    """Devolve as tarefas com ERRO para a fila (após corrigirmos a causa)."""
+    com_erro = list(
+        db.scalars(select(OutreachTask).where(OutreachTask.status == OutreachStatus.ERRO))
+    )
+    for t in com_erro:
+        t.status = OutreachStatus.PENDENTE
+        t.erro = ""
+    db.commit()
+    return {"reenfileirados": len(com_erro)}
 
 
 @router.post("/enviar-agora", response_model=dict)

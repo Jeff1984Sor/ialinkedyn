@@ -19,6 +19,8 @@ class Lead(Base):
     empresa: Mapped[str] = mapped_column(String(180), default="", nullable=False)
     cargo: Mapped[str] = mapped_column(String(180), default="", nullable=False)
     linkedin_url: Mapped[str] = mapped_column(String(500), default="", nullable=False)
+    # id interno da pessoa no provedor — necessário para convite/mensagem
+    provider_id: Mapped[str] = mapped_column(String(200), default="", nullable=False)
     origem: Mapped[str] = mapped_column(String(120), default="", nullable=False)
     status: Mapped[str] = mapped_column(
         String(30), default=LeadStatus.NOVO.value, nullable=False

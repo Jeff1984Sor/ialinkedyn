@@ -113,18 +113,31 @@ def enviar_tarefa(db: Session, tarefa: OutreachTask) -> bool:
         db.commit()
         return False
 
+    if not lead.linkedin_url and not lead.provider_id:
+        tarefa.status = OutreachStatus.ERRO
+        tarefa.erro = (
+            "Lead sem URL do LinkedIn e sem ID do provedor — não dá para identificar "
+            "a pessoa. Importe-o pela busca."
+        )
+        db.commit()
+        return False
+
     provider = get_provider(db)
     try:
-        if tarefa.tipo == OutreachTipo.MENSAGEM and lead.linkedin_url:
-            # mensagem direta: precisa do provider_id da pessoa
-            perfil = provider.obter_perfil(lead.linkedin_url)
+        # o id interno pode já estar salvo no lead (vindo da busca)
+        pid = (lead.provider_id or "").strip()
+
+        if tarefa.tipo == OutreachTipo.MENSAGEM:
+            if not pid:
+                pid = provider.obter_perfil(lead.linkedin_url).provider_id
+                lead.provider_id = pid
             enviar = getattr(provider, "iniciar_conversa", None)
             if enviar is None:
                 raise HTTPException(status_code=501, detail="Provedor não suporta iniciar conversa")
-            enviar(perfil.provider_id, tarefa.mensagem)
+            enviar(pid, tarefa.mensagem)
         else:
             # convite com nota (padrão para quem ainda não é conexão)
-            provider.enviar_convite(lead.linkedin_url, tarefa.mensagem)
+            provider.enviar_convite(lead.linkedin_url, tarefa.mensagem, provider_id=pid)
 
         tarefa.status = OutreachStatus.ENVIADO
         tarefa.enviado_em = datetime.now(timezone.utc)
