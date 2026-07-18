@@ -134,6 +134,27 @@ class UnipileProvider(LinkedInProvider):
         )
         return _para_perfil(dados)
 
+    def obter_perfil_completo(self, linkedin_url: str) -> dict[str, Any]:
+        """Perfil cru do LinkedIn — inclui contatos (e-mail, telefone),
+        experiências, formação e habilidades."""
+        conta = self._exige_conta()
+        identificador = _identificador_de_url(linkedin_url)
+        if not identificador:
+            raise HTTPException(
+                status_code=400,
+                detail="Este lead não tem URL do LinkedIn.",
+            )
+        dados = self._req(
+            "GET",
+            f"/users/{identificador}",
+            params={
+                "account_id": conta,
+                # pede as seções extras do perfil
+                "linkedin_sections": "*",
+            },
+        )
+        return dados if isinstance(dados, dict) else {}
+
     # ------------------------------------------------------------------ busca
 
     # a busca "classic" devolve no máximo 50 por página

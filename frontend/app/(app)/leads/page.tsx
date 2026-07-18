@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Plus, Trash2, X, Users, Loader2, Target, Copy, Check, Send, ShieldAlert, Clock } from "lucide-react";
+import { Plus, Trash2, X, Users, Loader2, Target, Copy, Check, Send, ShieldAlert, Clock, Mail, ExternalLink, User as UserIcon } from "lucide-react";
 
 type Lead = {
   id: number;
@@ -19,6 +19,15 @@ type Lead = {
   ultimo_contato_em: string | null;
   ultimo_contato_tipo: string;
   ultimo_contato_status: string;
+};
+
+type Perfil = {
+  nome: string; headline: string; sobre: string; localidade: string;
+  linkedin_url: string; foto_url: string; seguidores: number | null; conexoes: number | null;
+  emails: string[]; telefones: string[]; sites: string[];
+  experiencias: { empresa: string; cargo: string; periodo: string; local: string }[];
+  formacoes: { instituicao: string; curso: string; periodo: string }[];
+  habilidades: string[]; aviso: string;
 };
 
 const STATUS = ["NOVO", "SEGUINDO", "CONVIDADO", "ABORDADO", "RESPONDEU", "QUALIFICADO", "GANHO", "PERDIDO"];
@@ -46,6 +55,11 @@ export default function LeadsPage() {
   const [selecionados, setSelecionados] = useState<Set<number>>(new Set());
   const [tipoMassa, setTipoMassa] = useState<"CONVITE" | "MENSAGEM" | "INMAIL">("CONVITE");
   const [enviandoMassa, setEnviandoMassa] = useState(false);
+
+  // modal de perfil completo
+  const [perfil, setPerfil] = useState<Perfil | null>(null);
+  const [carregandoPerfil, setCarregandoPerfil] = useState<number | null>(null);
+  const [erroPerfil, setErroPerfil] = useState("");
 
   // modal de abordagem gerada
   const [abordagem, setAbordagem] = useState<string | null>(null);
@@ -118,6 +132,25 @@ export default function LeadsPage() {
       alert(e instanceof Error ? e.message : "Erro ao enfileirar");
     } finally {
       setEnviandoMassa(false);
+    }
+  }
+
+  async function abrirPerfil(lead: Lead) {
+    setCarregandoPerfil(lead.id);
+    setPerfil(null);
+    setErroPerfil("");
+    try {
+      setPerfil(await api<Perfil>(`/perfil/lead/${lead.id}`));
+    } catch (e) {
+      setErroPerfil(e instanceof Error ? e.message : "Erro ao buscar perfil");
+      setPerfil({
+        nome: lead.nome, headline: lead.headline, sobre: "", localidade: "",
+        linkedin_url: lead.linkedin_url, foto_url: "", seguidores: null, conexoes: null,
+        emails: [], telefones: [], sites: [], experiencias: [], formacoes: [],
+        habilidades: [], aviso: "",
+      });
+    } finally {
+      setCarregandoPerfil(null);
     }
   }
 
@@ -217,7 +250,10 @@ export default function LeadsPage() {
                       checked={selecionados.has(l.id)} onChange={() => alternarSel(l.id)} />
                   </td>
                   <td className="px-4 py-3">
-                    <p className="font-medium text-ink">{l.nome}</p>
+                    <button onClick={() => abrirPerfil(l)} className="font-medium text-ink hover:text-brand hover:underline text-left flex items-center gap-1">
+                      {carregandoPerfil === l.id && <Loader2 className="h-3 w-3 animate-spin" />}
+                      {l.nome}
+                    </button>
                     {l.headline && <p className="text-xs text-ink-soft">{l.headline}</p>}
                   </td>
                   <td className="px-4 py-3 text-ink-soft">{[l.empresa, l.cargo].filter(Boolean).join(" · ")}</td>
@@ -286,6 +322,118 @@ export default function LeadsPage() {
                 {salvando && <Loader2 className="h-4 w-4 animate-spin" />} Salvar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal perfil completo */}
+      {perfil && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50" onClick={() => setPerfil(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                {perfil.foto_url ? (
+                  <img src={perfil.foto_url} alt="" className="h-14 w-14 rounded-full object-cover" />
+                ) : (
+                  <div className="h-14 w-14 rounded-full bg-brand/10 flex items-center justify-center">
+                    <UserIcon className="h-7 w-7 text-brand" />
+                  </div>
+                )}
+                <div>
+                  <h2 className="text-lg font-semibold text-ink">{perfil.nome}</h2>
+                  <p className="text-sm text-ink-soft">{perfil.headline}</p>
+                  {perfil.localidade && <p className="text-xs text-ink-soft">{perfil.localidade}</p>}
+                </div>
+              </div>
+              <button onClick={() => setPerfil(null)} className="p-1 rounded hover:bg-slate-100"><X className="h-5 w-5" /></button>
+            </div>
+
+            {erroPerfil && (
+              <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700 mb-3">{erroPerfil}</div>
+            )}
+
+            {(perfil.seguidores || perfil.conexoes) && (
+              <div className="flex gap-4 text-sm text-ink-soft mb-4">
+                {perfil.conexoes != null && <span><strong className="text-ink">{perfil.conexoes}</strong> conexoes</span>}
+                {perfil.seguidores != null && <span><strong className="text-ink">{perfil.seguidores}</strong> seguidores</span>}
+              </div>
+            )}
+
+            {/* CONTATOS */}
+            <div className="rounded-xl border border-slate-200 p-4 mb-4">
+              <h3 className="font-semibold text-ink text-sm mb-2 flex items-center gap-2">
+                <Mail className="h-4 w-4 text-brand" /> Contatos
+              </h3>
+              {perfil.emails.length === 0 && perfil.telefones.length === 0 && perfil.sites.length === 0 ? (
+                <p className="text-sm text-ink-soft">{perfil.aviso || "Nenhum contato disponivel."}</p>
+              ) : (
+                <div className="space-y-2">
+                  {perfil.emails.map((e) => (
+                    <div key={e} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="text-ink">{e}</span>
+                      <button onClick={() => navigator.clipboard.writeText(e)} className="text-xs text-brand hover:underline">copiar</button>
+                    </div>
+                  ))}
+                  {perfil.telefones.map((t) => (
+                    <div key={t} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="text-ink">{t}</span>
+                      <button onClick={() => navigator.clipboard.writeText(t)} className="text-xs text-brand hover:underline">copiar</button>
+                    </div>
+                  ))}
+                  {perfil.sites.map((w) => (
+                    <a key={w} href={w} target="_blank" rel="noreferrer" className="block text-sm text-brand hover:underline truncate">{w}</a>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {perfil.sobre && (
+              <div className="mb-4">
+                <h3 className="font-semibold text-ink text-sm mb-1">Sobre</h3>
+                <p className="text-sm text-ink-soft whitespace-pre-wrap">{perfil.sobre}</p>
+              </div>
+            )}
+
+            {perfil.experiencias.length > 0 && (
+              <div className="mb-4">
+                <h3 className="font-semibold text-ink text-sm mb-2">Experiencia</h3>
+                <div className="space-y-2">
+                  {perfil.experiencias.map((x, i) => (
+                    <div key={i} className="text-sm">
+                      <p className="text-ink font-medium">{x.cargo}</p>
+                      <p className="text-ink-soft">{[x.empresa, x.periodo, x.local].filter(Boolean).join(" - ")}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {perfil.formacoes.length > 0 && (
+              <div className="mb-4">
+                <h3 className="font-semibold text-ink text-sm mb-2">Formacao</h3>
+                {perfil.formacoes.map((f, i) => (
+                  <p key={i} className="text-sm text-ink-soft">{[f.instituicao, f.curso, f.periodo].filter(Boolean).join(" - ")}</p>
+                ))}
+              </div>
+            )}
+
+            {perfil.habilidades.length > 0 && (
+              <div className="mb-4">
+                <h3 className="font-semibold text-ink text-sm mb-2">Habilidades</h3>
+                <div className="flex flex-wrap gap-1">
+                  {perfil.habilidades.map((h) => (
+                    <span key={h} className="text-xs bg-slate-100 text-ink-soft rounded px-2 py-0.5">{h}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {perfil.linkedin_url && (
+              <a href={perfil.linkedin_url} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1 text-sm text-brand hover:underline">
+                <ExternalLink className="h-4 w-4" /> Abrir no LinkedIn
+              </a>
+            )}
           </div>
         </div>
       )}

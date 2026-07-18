@@ -16,6 +16,7 @@ from app.routers import (
     dashboard,
     knowledge,
     leads,
+    perfil,
     prompts,
     rede,
 )
@@ -58,3 +59,4 @@ app.include_router(prompts.router)
 app.include_router(audiences.router)
 app.include_router(campanha.router)
 app.include_router(rede.router)
+app.include_router(perfil.router)
