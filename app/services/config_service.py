@@ -41,12 +41,32 @@ def cifra(valor: str) -> str:
     return encrypt_token(valor) if valor else ""
 
 
+# ------------------------------------------------------------------ IA
+
+
+def get_ia(db: Session) -> tuple[str, str, str]:
+    """Devolve (provider, api_key, model) do motor de IA escolhido."""
+    cfg = get_config(db)
+    provider = (cfg.ia_provider or "gemini").lower()
+    if provider == "openai":
+        return "openai", _decifra(cfg.openai_api_key_cifrado), cfg.openai_model or "gpt-4o"
+    key = _decifra(cfg.gemini_api_key_cifrado) or settings.gemini_api_key or ""
+    return "gemini", key, cfg.gemini_model or settings.gemini_model or "gemini-2.5-flash"
+
+
 def get_gemini(db: Session) -> tuple[str, str]:
-    """Devolve (api_key, model) efetivos."""
+    """(compatibilidade) chave e modelo do Gemini."""
     cfg = get_config(db)
     key = _decifra(cfg.gemini_api_key_cifrado) or settings.gemini_api_key or ""
-    model = cfg.gemini_model or settings.gemini_model or "gemini-2.5-flash"
-    return key, model
+    return key, cfg.gemini_model or settings.gemini_model or "gemini-2.5-flash"
+
+
+def get_openai(db: Session) -> tuple[str, str]:
+    cfg = get_config(db)
+    return _decifra(cfg.openai_api_key_cifrado), cfg.openai_model or "gpt-4o"
+
+
+# ------------------------------------------------------------------ LinkedIn
 
 
 def get_provider_name(db: Session) -> str:
@@ -54,12 +74,12 @@ def get_provider_name(db: Session) -> str:
     return cfg.linkedin_provider or settings.linkedin_provider or "mock"
 
 
-def get_unipile(db: Session) -> tuple[str, str]:
-    """Devolve (dsn, api_key) efetivos."""
+def get_unipile(db: Session) -> tuple[str, str, str]:
+    """Devolve (dsn, api_key, account_id) efetivos."""
     cfg = get_config(db)
     dsn = cfg.unipile_dsn or settings.unipile_dsn or ""
     key = _decifra(cfg.unipile_api_key_cifrado) or settings.unipile_api_key or ""
-    return dsn, key
+    return dsn, key, cfg.unipile_account_id or ""
 
 
 def mascarar(valor: str) -> str:

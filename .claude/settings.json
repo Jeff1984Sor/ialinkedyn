@@ -3,7 +3,10 @@
     "allow": [
       "Bash(git push *)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "WebSearch",
+      "WebFetch(domain:developer.unipile.com)",
+      "Bash(python -)"
     ]
   }
 }

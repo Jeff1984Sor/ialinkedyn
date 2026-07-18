@@ -28,11 +28,12 @@ from app.services.config_service import (
     cifra,
     get_config,
     get_gemini,
+    get_openai,
     get_provider_name,
     get_unipile,
     mascarar,
 )
-from app.services.gemini import testar_chave
+from app.services.ia import testar as testar_ia_service
 
 router = APIRouter(prefix="/connection", tags=["connection"])
 
@@ -69,16 +70,22 @@ def obter_config(
     _: User = Depends(get_current_user),
 ) -> ConfigOut:
     cfg = get_config(db)
-    _, unipile_key = get_unipile(db)
+    _, unipile_key, account_id = get_unipile(db)
     gemini_key, gemini_model = get_gemini(db)
+    openai_key, openai_model = get_openai(db)
     return ConfigOut(
         linkedin_provider=cfg.linkedin_provider,
         unipile_dsn=cfg.unipile_dsn,
+        unipile_account_id=account_id,
         unipile_key_configurada=bool(unipile_key),
         unipile_key_mascarada=mascarar(unipile_key),
+        ia_provider=cfg.ia_provider or "gemini",
         gemini_key_configurada=bool(gemini_key),
         gemini_key_mascarada=mascarar(gemini_key),
         gemini_model=gemini_model,
+        openai_key_configurada=bool(openai_key),
+        openai_key_mascarada=mascarar(openai_key),
+        openai_model=openai_model,
     )
 
 
@@ -94,13 +101,22 @@ def atualizar_config(
     if dados.linkedin_provider is not None:
         cfg.linkedin_provider = dados.linkedin_provider
     if dados.unipile_dsn is not None:
-        cfg.unipile_dsn = dados.unipile_dsn
+        cfg.unipile_dsn = dados.unipile_dsn.strip()
+    if dados.unipile_account_id is not None:
+        cfg.unipile_account_id = dados.unipile_account_id.strip()
+    if dados.unipile_api_key is not None:
+        cfg.unipile_api_key_cifrado = cifra(dados.unipile_api_key.strip())
+
+    if dados.ia_provider is not None:
+        cfg.ia_provider = dados.ia_provider
     if dados.gemini_model is not None:
         cfg.gemini_model = dados.gemini_model or "gemini-2.5-flash"
-    if dados.unipile_api_key is not None:
-        cfg.unipile_api_key_cifrado = cifra(dados.unipile_api_key)
     if dados.gemini_api_key is not None:
-        cfg.gemini_api_key_cifrado = cifra(dados.gemini_api_key)
+        cfg.gemini_api_key_cifrado = cifra(dados.gemini_api_key.strip())
+    if dados.openai_model is not None:
+        cfg.openai_model = dados.openai_model or "gpt-4o"
+    if dados.openai_api_key is not None:
+        cfg.openai_api_key_cifrado = cifra(dados.openai_api_key.strip())
 
     db.commit()
     return obter_config(db=db, _=user)
@@ -111,11 +127,28 @@ def testar_ia(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ) -> TesteIAResult:
-    """Faz uma chamada real ao Gemini para validar a chave salva."""
-    api_key, model = get_gemini(db)
+    """Faz uma chamada real ao motor de IA escolhido para validar a chave."""
     try:
-        resposta = testar_chave(api_key, model)
-        return TesteIAResult(ok=True, mensagem=f"Funcionando! ({model}) → {resposta[:60]}")
+        return TesteIAResult(ok=True, mensagem=testar_ia_service(db))
+    except HTTPException as e:
+        return TesteIAResult(ok=False, mensagem=str(e.detail))
+
+
+@router.post("/testar-linkedin", response_model=TesteIAResult)
+def testar_linkedin(
+    db: Session = Depends(get_db),
+    _: User = Depends(get_current_user),
+) -> TesteIAResult:
+    """Valida as credenciais do provedor (chama a API real do Unipile)."""
+    nome = get_provider_name(db)
+    if nome == "mock":
+        return TesteIAResult(ok=True, mensagem="Provedor simulado (mock) — sempre disponível.")
+    try:
+        from app.providers.unipile import UnipileProvider
+
+        dsn, key, account_id = get_unipile(db)
+        provider = UnipileProvider(dsn=dsn, api_key=key, account_id=account_id)
+        return TesteIAResult(ok=True, mensagem=provider.testar())
     except HTTPException as e:
         return TesteIAResult(ok=False, mensagem=str(e.detail))
 
@@ -134,9 +167,16 @@ def status(
     if provider == "mock":
         pronto, aviso = True, _AVISO_MOCK
     elif provider == "unipile":
-        _, key = get_unipile(db)
-        pronto = bool(key)
-        aviso = "" if pronto else _AVISO_UNIPILE_SEM_CHAVE
+        dsn, key, account_id = get_unipile(db)
+        pronto = bool(key and dsn and account_id)
+        if pronto:
+            aviso = ""
+        elif not key or not dsn:
+            aviso = _AVISO_UNIPILE_SEM_CHAVE
+        else:
+            aviso = (
+                "Falta o Account ID do Unipile — copie da página Accounts do painel deles."
+            )
     else:
         pronto, aviso = False, f"Provedor desconhecido: {provider}"
 
@@ -162,14 +202,37 @@ def conectar(
     provider = get_provider_name(db)
 
     if provider == "unipile":
-        raise HTTPException(
-            status_code=501,
-            detail=(
-                "Conexão real via Unipile ainda não implementada (Fase 3). "
-                "Selecione o provedor 'Simulado (mock)' para desenvolver."
-            ),
-        )
-    if provider != "mock":
+        # valida de verdade contra a API do Unipile antes de marcar como conectado
+        from app.providers.unipile import UnipileProvider
+
+        dsn, key, account_id = get_unipile(db)
+        if not account_id:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Preencha o Account ID do Unipile (página Accounts do painel deles) "
+                    "antes de conectar."
+                ),
+            )
+        cliente = UnipileProvider(dsn=dsn, api_key=key, account_id=account_id)
+        contas = cliente.listar_contas()
+        encontrada = next((c for c in contas if str(c.get("id")) == account_id), None)
+        if encontrada is None:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"O Account ID '{account_id}' não foi encontrado nas contas do seu "
+                    "Unipile. Confira o ID na página Accounts."
+                ),
+            )
+        external_id = account_id
+        token_guardado = key
+        nome_conta = dados.nome or str(encontrada.get("name") or "LinkedIn")
+    elif provider == "mock":
+        external_id = "mock-account-1"
+        token_guardado = "token-simulado"
+        nome_conta = dados.nome
+    else:
         raise HTTPException(status_code=400, detail=f"Provedor desconhecido: {provider}")
 
     conta = _get_account(db)
@@ -177,11 +240,11 @@ def conectar(
         conta = LinkedInAccount()
         db.add(conta)
 
-    conta.nome = dados.nome
+    conta.nome = nome_conta
     conta.provider = provider
-    conta.external_account_id = "mock-account-1"
+    conta.external_account_id = external_id
     conta.status = "CONECTADO"
-    conta.token_cifrado = encrypt_token("token-simulado")
+    conta.token_cifrado = encrypt_token(token_guardado)
     conta.conectado_em = datetime.now(timezone.utc)
     db.commit()
 

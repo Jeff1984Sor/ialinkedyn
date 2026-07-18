@@ -47,13 +47,20 @@ class AutomationUpdate(BaseModel):
 class ConfigOut(BaseModel):
     """Configuração da ferramenta (segredos SEMPRE mascarados)."""
 
+    # LinkedIn
     linkedin_provider: str
     unipile_dsn: str = ""
+    unipile_account_id: str = ""
     unipile_key_configurada: bool = False
     unipile_key_mascarada: str = ""
+    # IA
+    ia_provider: str = "gemini"
     gemini_key_configurada: bool = False
     gemini_key_mascarada: str = ""
     gemini_model: str = "gemini-2.5-flash"
+    openai_key_configurada: bool = False
+    openai_key_mascarada: str = ""
+    openai_model: str = "gpt-4o"
 
 
 class ConfigUpdate(BaseModel):
@@ -62,8 +69,12 @@ class ConfigUpdate(BaseModel):
     linkedin_provider: str | None = Field(default=None, pattern="^(mock|unipile)$")
     unipile_dsn: str | None = None
     unipile_api_key: str | None = None
+    unipile_account_id: str | None = None
+    ia_provider: str | None = Field(default=None, pattern="^(gemini|openai)$")
     gemini_api_key: str | None = None
     gemini_model: str | None = None
+    openai_api_key: str | None = None
+    openai_model: str | None = None
 
 
 class TesteIAResult(BaseModel):

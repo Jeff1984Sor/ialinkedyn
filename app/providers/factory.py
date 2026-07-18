@@ -6,18 +6,15 @@ from sqlalchemy.orm import Session
 
 from app.providers.base import LinkedInProvider
 from app.providers.mock import MockProvider
-from app.services.config_service import get_provider_name
+from app.providers.unipile import UnipileProvider
+from app.services.config_service import get_provider_name, get_unipile
 
 
 def get_provider(db: Session) -> LinkedInProvider:
     nome = get_provider_name(db)
     if nome == "unipile":
-        # UnipileProvider entra na Fase 3 (provedor real).
-        raise HTTPException(
-            status_code=501,
-            detail=(
-                "Provedor Unipile ainda não implementado (Fase 3). "
-                "Em Conexões, selecione o provedor 'Simulado (mock)' para desenvolver."
-            ),
-        )
-    return MockProvider()
+        dsn, api_key, account_id = get_unipile(db)
+        return UnipileProvider(dsn=dsn, api_key=api_key, account_id=account_id)
+    if nome == "mock":
+        return MockProvider()
+    raise HTTPException(status_code=400, detail=f"Provedor desconhecido: {nome}")

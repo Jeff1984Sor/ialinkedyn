@@ -19,6 +19,8 @@ class PerfilLinkedIn:
     linkedin_url: str = ""
     sobre: str = ""
     posts_recentes: list[str] = field(default_factory=list)
+    # id interno da pessoa no provedor (necessário para convite/mensagem)
+    provider_id: str = ""
 
 
 @dataclass

@@ -14,8 +14,7 @@ from app.schemas.prompt import (
     PromptOut,
     PromptUpdate,
 )
-from app.services.config_service import get_gemini
-from app.services.gemini import gerar_texto
+from app.services.ia import gerar
 
 router = APIRouter(prefix="/prompts", tags=["prompts"])
 
@@ -76,8 +75,7 @@ def melhorar(
         raise HTTPException(status_code=404, detail="Prompt não encontrado")
 
     atual = dados.conteudo_atual or prompt_store.resolver(db, chave)
-    api_key, model = get_gemini(db)
-    sugestao = gerar_texto(prompt_melhorar(chave, atual, dados.instrucao), api_key, model)
+    sugestao = gerar(db, prompt_melhorar(chave, atual, dados.instrucao))
 
     # remove cercas de código, se a IA insistir em usar
     limpo = sugestao.strip()

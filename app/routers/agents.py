@@ -26,8 +26,8 @@ from app.schemas.agent import (
     ResponderResponse,
 )
 from app.services.brand import get_or_create_brand
-from app.services.config_service import get_gemini, get_provider_name
-from app.services.gemini import gerar_texto
+from app.services.config_service import get_provider_name
+from app.services.ia import gerar
 from app.services.knowledge_search import buscar_relevantes
 
 router = APIRouter(prefix="/agents", tags=["agents"])
@@ -60,10 +60,9 @@ def responder(
         f"[{m.autor}] {m.conteudo}" for m in conversa.mensagens
     )
 
-    api_key, model = get_gemini(db)
     template = prompt_store.resolver(db, "atendente")
     prompt = montar_atendente(template, brand, qa, historico, mensagem_lead)
-    resposta = gerar_texto(prompt, api_key, model)
+    resposta = gerar(db, prompt)
 
     if dados.salvar_rascunho:
         rascunho = Message(
@@ -112,10 +111,9 @@ def prospectar(
             detail="Informe um linkedin_url, um lead_id ou um perfil_texto.",
         )
 
-    api_key, model = get_gemini(db)
     template = prompt_store.resolver(db, "cacador")
     prompt = montar_cacador(template, brand, perfil_texto)
-    abordagem = gerar_texto(prompt, api_key, model)
+    abordagem = gerar(db, prompt)
     return ProspectarResponse(abordagem=abordagem, perfil_resumo=resumo)
 
 
