@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Plus, Trash2, X, Users, Loader2, Target, Copy, Check, Send, ShieldAlert } from "lucide-react";
+import { Plus, Trash2, X, Users, Loader2, Target, Copy, Check, Send, ShieldAlert, Clock } from "lucide-react";
 
 type Lead = {
   id: number;
@@ -15,6 +15,10 @@ type Lead = {
   status: string;
   notas: string;
   criado_em: string;
+  ja_abordado: boolean;
+  ultimo_contato_em: string | null;
+  ultimo_contato_tipo: string;
+  ultimo_contato_status: string;
 };
 
 const STATUS = ["NOVO", "SEGUINDO", "CONVIDADO", "ABORDADO", "RESPONDEU", "QUALIFICADO", "GANHO", "PERDIDO"];
@@ -130,6 +134,8 @@ export default function LeadsPage() {
     }
   }
 
+  const naoAbordados = leads.filter((l) => !l.ja_abordado);
+
   const input = "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-brand";
 
   return (
@@ -164,9 +170,9 @@ export default function LeadsPage() {
         <div className="rounded-xl bg-white border border-slate-200 shadow-sm p-4 flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-sm text-ink">
             <input type="checkbox" className="h-4 w-4 accent-brand"
-              checked={selecionados.size === leads.length && leads.length > 0}
-              onChange={(e) => setSelecionados(e.target.checked ? new Set(leads.map((l) => l.id)) : new Set())} />
-            Selecionar todos ({leads.length})
+              checked={naoAbordados.length > 0 && selecionados.size === naoAbordados.length}
+              onChange={(e) => setSelecionados(e.target.checked ? new Set(naoAbordados.map((l) => l.id)) : new Set())} />
+            Selecionar nao abordados ({naoAbordados.length})
           </label>
 
           <span className="text-sm text-ink-soft">{selecionados.size} selecionado(s)</span>
@@ -197,6 +203,7 @@ export default function LeadsPage() {
                 <th className="text-left px-4 py-3 font-medium">Nome</th>
                 <th className="text-left px-4 py-3 font-medium">Empresa / Cargo</th>
                 <th className="text-left px-4 py-3 font-medium">Status</th>
+                <th className="text-left px-4 py-3 font-medium">Abordagem</th>
                 <th className="text-right px-4 py-3 font-medium">Ações</th>
               </tr>
             </thead>
@@ -204,7 +211,9 @@ export default function LeadsPage() {
               {leads.map((l) => (
                 <tr key={l.id} className="border-t border-slate-100">
                   <td className="px-4 py-3">
-                    <input type="checkbox" className="h-4 w-4 accent-brand"
+                    <input type="checkbox" className="h-4 w-4 accent-brand disabled:opacity-40"
+                      disabled={l.ja_abordado}
+                      title={l.ja_abordado ? "Ja abordado" : ""}
                       checked={selecionados.has(l.id)} onChange={() => alternarSel(l.id)} />
                   </td>
                   <td className="px-4 py-3">
@@ -216,6 +225,26 @@ export default function LeadsPage() {
                     <select value={l.status} onChange={(e) => mudarStatus(l, e.target.value)} className={`text-xs rounded-full px-2 py-1 border-0 cursor-pointer ${CORES[l.status] || ""}`}>
                       {STATUS.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
+                  </td>
+                  <td className="px-4 py-3">
+                    {l.ja_abordado ? (
+                      <div className="flex flex-col">
+                        <span className={`inline-flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 w-fit ${
+                          l.ultimo_contato_status === "ENVIADO"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-amber-100 text-amber-700"
+                        }`}>
+                          {l.ultimo_contato_status === "ENVIADO" ? <Check className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                          {l.ultimo_contato_status === "ENVIADO" ? "Enviado" : "Na fila"}
+                        </span>
+                        <span className="text-[11px] text-ink-soft mt-0.5">
+                          {l.ultimo_contato_tipo}
+                          {l.ultimo_contato_em ? ` - ${new Date(l.ultimo_contato_em).toLocaleDateString("pt-BR")}` : ""}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-ink-soft">-</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1">

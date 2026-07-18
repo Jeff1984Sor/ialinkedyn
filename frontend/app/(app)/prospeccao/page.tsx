@@ -17,6 +17,7 @@ type Perfil = {
   sobre: string;
   posts_recentes: string[];
   ja_importado: boolean;
+  ja_abordado: boolean;
 };
 
 type BuscaResp = { termo_usado: string; provider: string; simulado: boolean; perfis: Perfil[]; seguindo_automaticamente: number };
@@ -132,7 +133,7 @@ export default function ProspeccaoPage() {
     await carregarFila();
   }
 
-  const selecionaveis = busca?.perfis ?? [];
+  const selecionaveis = (busca?.perfis ?? []).filter((p) => !p.ja_abordado);
 
   return (
     <div className="space-y-6">
@@ -213,21 +214,29 @@ export default function ProspeccaoPage() {
           {selecionaveis.length > 0 && (
             <label className="flex items-center gap-2 text-sm text-ink-soft">
               <input type="checkbox" className="h-4 w-4 accent-brand"
-                checked={selecionados.size === selecionaveis.length && selecionaveis.length > 0}
+                checked={selecionaveis.length > 0 && selecionados.size === selecionaveis.length}
                 onChange={(e) => setSelecionados(e.target.checked ? new Set(selecionaveis.map((p) => p.linkedin_url)) : new Set())} />
-              Selecionar todos
+              Selecionar nao abordados
             </label>
           )}
 
           <div className="space-y-2">
             {busca.perfis.map((p) => (
               <div key={p.linkedin_url || p.nome} className="flex items-start gap-3 rounded-lg border border-slate-200 p-3">
-                <input type="checkbox" className="h-4 w-4 accent-brand mt-1"
+                <input type="checkbox" className="h-4 w-4 accent-brand mt-1 disabled:opacity-40"
+                  disabled={p.ja_abordado}
+                  title={p.ja_abordado ? "Ja abordado" : ""}
                   checked={selecionados.has(p.linkedin_url)} onChange={() => alternar(p.linkedin_url)} />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-ink text-sm">{p.nome}</p>
-                    {p.ja_importado && <span className="text-[11px] bg-slate-100 text-ink-soft rounded-full px-2 py-0.5">já no CRM</span>}
+                    {p.ja_abordado ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5">
+                        <CheckCircle2 className="h-3 w-3" /> ja abordado
+                      </span>
+                    ) : p.ja_importado ? (
+                      <span className="text-[11px] bg-slate-100 text-ink-soft rounded-full px-2 py-0.5">ja no CRM</span>
+                    ) : null}
                   </div>
                   <p className="text-sm text-ink-soft">{p.headline}</p>
                   {p.linkedin_url && (

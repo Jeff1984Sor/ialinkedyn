@@ -39,3 +39,8 @@ class LeadOut(LeadBase):
 
     id: int
     criado_em: datetime
+    # histórico de abordagem (para não abordar a mesma pessoa duas vezes)
+    ja_abordado: bool = False
+    ultimo_contato_em: datetime | None = None
+    ultimo_contato_tipo: str = ""
+    ultimo_contato_status: str = ""

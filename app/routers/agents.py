@@ -11,6 +11,7 @@ from app.core.deps import get_current_user, get_db
 from app.models.conversation import Conversation, Message
 from app.models.enums import MessageAuthor
 from app.models.lead import Lead
+from app.models.outreach import OutreachStatus, OutreachTask
 from app.models.user import User
 from app.providers.base import PerfilLinkedIn
 from app.providers.factory import get_provider
@@ -150,6 +151,24 @@ def buscar(
         pid for (pid,) in db.execute(select(Lead.provider_id).where(Lead.provider_id != "")).all()
     }
 
+    # quem já recebeu (ou tem na fila) alguma abordagem nossa
+    leads_abordados = {
+        lid
+        for (lid,) in db.execute(
+            select(OutreachTask.lead_id).where(
+                OutreachTask.status.in_([OutreachStatus.ENVIADO, OutreachStatus.PENDENTE])
+            )
+        ).all()
+    }
+    abordados_pid: set[str] = set()
+    abordados_slug: set[str] = set()
+    if leads_abordados:
+        for lead_ab in db.scalars(select(Lead).where(Lead.id.in_(leads_abordados))):
+            if lead_ab.provider_id:
+                abordados_pid.add(lead_ab.provider_id)
+            if lead_ab.linkedin_url:
+                abordados_slug.add(normalizar_url(lead_ab.linkedin_url))
+
     perfis = [
         PerfilEncontrado(
             nome=p.nome,
@@ -163,6 +182,10 @@ def buscar(
             ja_importado=bool(
                 (p.provider_id and p.provider_id in pids_existentes)
                 or (p.linkedin_url and normalizar_url(p.linkedin_url) in slugs_existentes)
+            ),
+            ja_abordado=bool(
+                (p.provider_id and p.provider_id in abordados_pid)
+                or (p.linkedin_url and normalizar_url(p.linkedin_url) in abordados_slug)
             ),
         )
         for p in encontrados

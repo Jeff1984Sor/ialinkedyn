@@ -47,6 +47,8 @@ class PerfilEncontrado(BaseModel):
     sobre: str = ""
     posts_recentes: list[str] = []
     ja_importado: bool = False
+    # ja recebeu (ou tem na fila) alguma abordagem nossa
+    ja_abordado: bool = False
 
 
 class BuscarResponse(BaseModel):
